@@ -1,8 +1,7 @@
-# Ledger boilerplate app
+# ledger-coda-app
 
 ## Overview
-This app is a boilerplate for a Nano S/X app.
-It does very little, and just expose a minimal API (get_app_config, get_address). 
+This app is the Coda app for the Nano S/X hardware wallet.
 
 ## Building and installing
 To build and install the app on your Ledger Nano S you must set up the Ledger Nano S build environments. Please follow the Getting Started instructions at [here](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html).

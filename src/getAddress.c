@@ -3,6 +3,7 @@
 #include "ux.h"
 #include "utils.h"
 
+static uint32_t account = 0;
 static char address[FULL_ADDRESS_LENGTH];
 
 static uint8_t set_result_get_address() {
@@ -14,11 +15,29 @@ static uint8_t set_result_get_address() {
     return tx;
 }
 
+void genAddress()
+{
+    if (address[0] == '\0')
+    {
+        // Simulate Coda Tweedle slowness
+        float x = 123.92;
+        for (size_t i = 0; i < 2000000; i++)
+            for (size_t j = 0; j < 10; j++)
+                x *= 1.002682;
+
+        uint8_t publicKey[32];
+        getPublicKey(account, publicKey);
+        getAddressStringFromBinary(publicKey, address);
+
+    }
+}
+
 //////////////////////////////////////////////////////////////////////
 
-UX_STEP_NOCB(
+UX_STEP_NOCB_INIT(
     ux_display_public_flow_5_step, 
-    bnnn_paging, 
+    bnnn_paging,
+    genAddress(),
     {
       .title = "Address",
       .text = address,
@@ -46,19 +65,25 @@ UX_FLOW(ux_display_public_flow,
   &ux_display_public_flow_7_step
 );
 
+UX_STEP_TIMEOUT(
+    ux_processing_step,
+    pb,
+    1,
+    ux_display_public_flow,
+    {
+      &C_icon_processing,
+      "Processing",
+    });
+
+UX_FLOW(ux_processing_flow,
+        &ux_processing_step);
+
 void handleGetAddress(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx) {
     UNUSED(dataLength);
     UNUSED(p2);
-    uint8_t publicKey[32];
+    address[0] = '\0';
+    account = readUint32BE(dataBuffer);
 
-    getPublicKey(readUint32BE(dataBuffer), publicKey);
-    getAddressStringFromBinary(publicKey, address);
-
-    if (p1 == P1_NON_CONFIRM) {
-        *tx = set_result_get_address();
-        THROW(0x9000);
-    } else {
-        ux_flow_init(0, ux_display_public_flow, NULL);
-        *flags |= IO_ASYNCH_REPLY;
-    }
+    ux_flow_init(0, ux_processing_flow, NULL);
+    *flags |= IO_ASYNCH_REPLY;
 }
