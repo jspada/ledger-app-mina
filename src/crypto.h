@@ -1,11 +1,11 @@
 #ifndef CODA_CRYPTO
 #define CODA_CRYPTO
 
-#define field_bytes   48
-#define scalar_bytes  48
-#define group_bytes   144
-#define affine_bytes  96
-#define scalar_bits   384   // scalar_bytes * 8
+#define field_bytes   32
+#define scalar_bytes  32
+#define group_bytes   96
+#define affine_bytes  64
+#define scalar_bits   256   // scalar_bytes * 8
 #define scalar_offset 2     // scalars have 382 ( = 384 - 2 ) used bits
 
 typedef unsigned char field[field_bytes];
