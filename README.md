@@ -1,7 +1,7 @@
-# ledger-coda-app
+# ledger-app-coda
 
 ## Overview
-This app is the Coda app for the Nano S/X hardware wallet.
+This is the Coda app for the Nano S/X hardware wallet.
 
 ## Building and installing
 To build and install the app on your Ledger Nano S you must set up the Ledger Nano S build environments. Please follow the Getting Started instructions at [here](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html).
