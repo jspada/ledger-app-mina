@@ -1,28 +1,11 @@
-#include "os.h"
-#include "cx.h"
-#include "globals.h"
+#pragma once
 
-#ifndef _UTILS_H_
-#define _UTILS_H_
-
-typedef enum rlpTxType {
-    TX_LENGTH = 0,
-    TX_TYPE,
-    TX_SENDER,
-    TX_RECIPIENT,
-    TX_AMOUNT,
-    TX_FEE
-} rlpTxType;
-
-unsigned int ui_prepro(const bagl_element_t *element);
-
-void getAddressStringFromBinary(uint8_t *publicKey, char *address);
-
-void getPublicKey(uint32_t accountNumber, uint8_t *publicKeyArray);
+#include <globals.h>
 
 uint32_t readUint32BE(uint8_t *buffer);
 
-void getPrivateKey(uint32_t accountNumber, cx_ecfp_private_key_t *privateKey);
+unsigned char encodeBase58(unsigned char WIDE *in, unsigned char length,
+                           unsigned char *out, unsigned char maxoutlen);
 
 void sendResponse(uint8_t tx, bool approve);
 
@@ -51,5 +34,3 @@ void sendResponse(uint8_t tx, bool approve);
         },                                                                 \
         (text), 0, 0, 0, NULL, NULL, NULL                                  \
     }
-
-#endif

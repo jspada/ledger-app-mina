@@ -1,4 +1,4 @@
-/*******************************************************************************
+/************************************************************************************************************************
  * All of the elliptic curve arithmetic is implemented in this file. That means:
  *  - field_add, field_sub, field_mul, field_sq, field_inv, field_negate, field_pow, field_eq
  *  - scalar_add, scalar_sub, scalar_mul, scalar_sq, scalar_pow, scalar_eq
@@ -10,72 +10,64 @@
  *    https://github.com/CodaProtocol/coda/blob/develop/docs/specs/signatures/description.md
  *
  * E1/Fp : y^2 = x^3 + 5
- * Tweedle_p = 28948022309329048855892746252171976963322203655955319056773317069363642105857
- * Tweedle_q = 28948022309329048855892746252171976963322203655954433126947083963168578338817
- ********************************************************************************/
+ * Tweedle Fp = 28948022309329048855892746252171976963322203655955319056773317069363642105857 (Dum, 0xe2, group order)
+ * Tweedle Fq = 28948022309329048855892746252171976963322203655954433126947083963168578338817 (Dee, 0xd4, field modulus)
+ ************************************************************************************************************************/
 
-#include "os.h"
-#include "cx.h"
 #include "crypto.h"
 #include "poseidon.h"
+#include "utils.h"
 
-// scalar field p
- static const field field_modulus = {
-    0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x03, 0x8a, 0xa1, 0x27, 0x6c, 0x3f, 0x59, 0xb9,
-    0xa1, 0x40, 0x64, 0xe2, 0x00, 0x00, 0x00, 0x01, };
-
-// base field q
-static const scalar group_order = {
+// scalar field Fq
+static const Field FIELD_MODULUS = {
     0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x03, 0x8a, 0xa1, 0x27, 0x69, 0x62, 0x86, 0xc9,
     0x84, 0x2c, 0xaf, 0xd4, 0x00, 0x00, 0x00, 0x01, };
 
+// base field Fp
+static const Scalar GROUP_ORDER = {
+    0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x03, 0x8a, 0xa1, 0x27, 0x6c, 0x3f, 0x59, 0xb9,
+    0xa1, 0x40, 0x64, 0xe2, 0x00, 0x00, 0x00, 0x01, };
+
 // a = 0, b = 5
-static const field group_coeff_b = {
+static const Field GROUP_COEFF_B = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, };
 
-static const field field_one = {
+static const Field FIELD_ONE = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, };
 
-static const field field_two = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, };
-
-static const field field_three = {
+static const Field FIELD_THREE = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, };
 
-static const field field_four = {
+static const Field FIELD_FOUR = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, };
 
-static const field field_eight = {
+static const Field FIELD_EIGHT = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, };
 
-static const field field_zero = {0};
-static const scalar scalar_zero = {0};
-static const affine affine_zero = {{0}, {0}};
+static const Field FIELD_ZERO = {0};
+static const Scalar SCALAR_ZERO = {0};
 
 // (X : Y : Z) = (0 : 1 : 0)
-static const group group_zero = {
+static const Group GROUP_ZERO = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -89,24 +81,8 @@ static const group group_zero = {
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, }};
 
-// g_generator = (1 :
-// 14240188643175251183985684255458419213835105645119662786317263805424119994471
-// : 1)
-static const group group_one = {
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, },
-    {0x1f, 0x7b, 0xa9, 0x41, 0x05, 0xab, 0x7f, 0x06,
-     0xc5, 0x61, 0x1d, 0x99, 0xcd, 0xa6, 0x58, 0x97,
-     0x21, 0x70, 0xf4, 0x01, 0xe4, 0x0b, 0x71, 0x3b,
-     0xb7, 0x28, 0x86, 0x69, 0xee, 0x92, 0x58, 0x67, },
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, }};
-
-static const affine affine_one = {
+// g_generator = (1 : 14240188643175251183985684255458419213835105645119662786317263805424119994471)
+static const Affine AFFINE_ONE = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -116,91 +92,111 @@ static const affine affine_one = {
      0x21, 0x70, 0xf4, 0x01, 0xe4, 0x0b, 0x71, 0x3b,
      0xb7, 0x28, 0x86, 0x69, 0xee, 0x92, 0x58, 0x67, }};
 
-void field_add(field c, const field a, const field b) {
-  cx_math_addm(c, a, b, field_modulus, field_bytes);
+void field_add(Field c, const Field a, const Field b)
+{
+  cx_math_addm(c, a, b, FIELD_MODULUS, FIELD_BYTES);
 }
 
-void field_sub(field c, const field a, const field b) {
-  cx_math_subm(c, a, b, field_modulus, field_bytes);
+void field_sub(Field c, const Field a, const Field b)
+{
+  cx_math_subm(c, a, b, FIELD_MODULUS, FIELD_BYTES);
 }
 
-void field_mul(field c, const field a, const field b) {
-  cx_math_multm(c, a, b, field_modulus, field_bytes);
+void field_mul(Field c, const Field a, const Field b)
+{
+  cx_math_multm(c, a, b, FIELD_MODULUS, FIELD_BYTES);
 }
 
-void field_sq(field c, const field a) {
-  cx_math_multm(c, a, a, field_modulus, field_bytes);
+void field_sq(Field c, const Field a)
+{
+  cx_math_multm(c, a, a, FIELD_MODULUS, FIELD_BYTES);
 }
 
-void field_inv(field c, const field a) {
-  cx_math_invprimem(c, a, field_modulus, field_bytes);
+void field_inv(Field c, const Field a)
+{
+  cx_math_invprimem(c, a, FIELD_MODULUS, FIELD_BYTES);
 }
 
-void field_negate(field c, const field a) {
-  cx_math_subm(c, field_modulus, a, field_modulus, field_bytes);
-}
-
-// c = a^e mod m
-// cx_math_powm(result_pointer, a, e, len_e, m, len(result)  (which is also
-// len(a) and len(m)) )
-void field_pow(field c, const field a, const field e) {
-  cx_math_powm(c, a, e, 1, field_modulus, field_bytes);
-}
-
-unsigned int field_eq(const field a, const field b) {
-  return (os_memcmp(a, b, field_bytes) == 0);
-}
-
-void scalar_add(scalar c, const scalar a, const scalar b) {
-  cx_math_addm(c, a, b, group_order, scalar_bytes);
-}
-
-void scalar_sub(scalar c, const scalar a, const scalar b) {
-  cx_math_subm(c, a, b, group_order, scalar_bytes);
-}
-
-void scalar_mul(scalar c, const scalar a, const scalar b) {
-  cx_math_multm(c, a, b, group_order, scalar_bytes);
-}
-
-void scalar_sq(scalar c, const scalar a) {
-  cx_math_multm(c, a, a, group_order, scalar_bytes);
+void field_negate(Field c, const Field a)
+{
+  cx_math_subm(c, FIELD_MODULUS, a, FIELD_MODULUS, FIELD_BYTES);
 }
 
 // c = a^e mod m
 // cx_math_powm(result_pointer, a, e, len_e, m, len(result)  (which is also
 // len(a) and len(m)) )
-void scalar_pow(scalar c, const scalar a, const scalar e) {
-  cx_math_powm(c, a, e, 1, group_order, scalar_bytes);
+void field_pow(Field c, const Field a, const Field e)
+{
+  cx_math_powm(c, a, e, 1, FIELD_MODULUS, FIELD_BYTES);
 }
 
-unsigned int scalar_eq(const scalar a, const scalar b) {
-  return (os_memcmp(a, b, scalar_bytes) == 0);
+unsigned int field_eq(const Field a, const Field b)
+{
+  return (os_memcmp(a, b, FIELD_BYTES) == 0);
+}
+
+void scalar_add(Scalar c, const Scalar a, const Scalar b)
+{
+  cx_math_addm(c, a, b, GROUP_ORDER, SCALAR_BYTES);
+}
+
+void scalar_sub(Scalar c, const Scalar a, const Scalar b)
+{
+  cx_math_subm(c, a, b, GROUP_ORDER, SCALAR_BYTES);
+}
+
+void scalar_mul(Scalar c, const Scalar a, const Scalar b)
+{
+  cx_math_multm(c, a, b, GROUP_ORDER, SCALAR_BYTES);
+}
+
+void scalar_sq(Scalar c, const Scalar a)
+{
+  cx_math_multm(c, a, a, GROUP_ORDER, SCALAR_BYTES);
+}
+
+// c = a^e mod m
+// cx_math_powm(result_pointer, a, e, len_e, m, len(result)  (which is also
+// len(a) and len(m)) )
+void scalar_pow(Scalar c, const Scalar a, const Scalar e)
+{
+  cx_math_powm(c, a, e, 1, GROUP_ORDER, SCALAR_BYTES);
+}
+
+unsigned int scalar_eq(const Scalar a, const Scalar b)
+{
+  return (os_memcmp(a, b, SCALAR_BYTES) == 0);
 }
 
 // zero is the only point with Z = 0 in jacobian coordinates
-unsigned int is_zero(const group *p) { return field_eq(p->Z, field_zero); }
-
-unsigned int affine_is_zero(const affine *p) {
-  return (field_eq(p->x, field_zero) && field_eq(p->y, field_zero));
+unsigned int is_zero(const Group *p)
+{
+    return field_eq(p->Z, FIELD_ZERO);
 }
 
-unsigned int is_on_curve(const group *p) {
+unsigned int affine_is_zero(const Affine *p)
+{
+  return (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO));
+}
+
+unsigned int is_on_curve(const Group *p)
+{
   if (is_zero(p)) {
     return 1;
   }
-  field lhs, rhs;
+  Field lhs, rhs;
 
-  if (field_eq(p->Z, field_one)) {
+  if (field_eq(p->Z, FIELD_ONE)) {
     // we can check y^2 == x^3 + ax + b
     field_sq(lhs, p->Y);                // y^2
     field_sq(rhs, p->X);                // x^2
     field_mul(rhs, rhs, p->X);          // x^3
-    field_add(rhs, rhs, group_coeff_b); // x^3 + b
-  } else {
+    field_add(rhs, rhs, GROUP_COEFF_B); // x^3 + b
+  }
+  else {
     // we check (y/z^3)^2 == (x/z^2)^3 + b
     // => y^2 == x^3 + bz^6
-    field x3, z6;
+    Field x3, z6;
     field_sq(x3, p->X);                 // x^2
     field_mul(x3, x3, p->X);            // x^3
     field_sq(lhs, p->Y);                // y^2
@@ -209,33 +205,35 @@ unsigned int is_on_curve(const group *p) {
     field_mul(z6, z6, p->Z);            // z^5
     field_mul(z6, z6, p->Z);            // z^6
 
-    field_mul(rhs, z6, group_coeff_b);  // bz^6
+    field_mul(rhs, z6, GROUP_COEFF_B);  // bz^6
     field_add(rhs, x3, rhs);            // x^3 + bz^6
   }
   return field_eq(lhs, rhs);
 }
 
-void affine_to_projective(group *r, const affine *p) {
-  if (field_eq(p->x, field_zero) && field_eq(p->y, field_zero)) {
-    os_memcpy(r->X, field_zero, field_bytes);
-    os_memcpy(r->Y, field_one, field_bytes);
-    os_memcpy(r->Z, field_zero, field_bytes);
+void affine_to_projective(Group *r, const Affine *p)
+{
+  if (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO)) {
+    os_memcpy(r->X, FIELD_ZERO, FIELD_BYTES);
+    os_memcpy(r->Y, FIELD_ONE, FIELD_BYTES);
+    os_memcpy(r->Z, FIELD_ZERO, FIELD_BYTES);
     return;
   }
-  os_memcpy(r->X, p->x, field_bytes);
-  os_memcpy(r->Y, p->y, field_bytes);
-  os_memcpy(r->Z, field_one, field_bytes);
+  os_memcpy(r->X, p->x, FIELD_BYTES);
+  os_memcpy(r->Y, p->y, FIELD_BYTES);
+  os_memcpy(r->Z, FIELD_ONE, FIELD_BYTES);
   return;
 }
 
-void projective_to_affine(affine *r, const group *p) {
-  if (field_eq(p->Z, field_zero)) {
-    os_memcpy(r->x, field_zero, field_bytes);
-    os_memcpy(r->y, field_zero, field_bytes);
+void projective_to_affine(Affine *r, const Group *p)
+{
+  if (field_eq(p->Z, FIELD_ZERO)) {
+    os_memcpy(r->x, FIELD_ZERO, FIELD_BYTES);
+    os_memcpy(r->y, FIELD_ZERO, FIELD_BYTES);
     return;
   }
 
-  field zi, zi2, zi3;
+  Field zi, zi2, zi3;
   field_inv(zi, p->Z);        // 1/Z
   field_mul(zi2, zi, zi);     // 1/Z^2
   field_mul(zi3, zi2, zi);    // 1/Z^3
@@ -247,31 +245,32 @@ void projective_to_affine(affine *r, const group *p) {
 
 // https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
 // cost 2M + 5S + 6add + 3*2 + 1*3 + 1*8
-void group_dbl(group *r, const group *p) {
+void group_dbl(Group *r, const Group *p)
+{
   if (is_zero(p)) {
     *r = *p;
     return;
   }
 
-  field a, b, c;
+  Field a, b, c;
   field_sq(a, p->X);                // a = X1^2
   field_sq(b, p->Y);                // b = Y1^2
   field_sq(c, b);                   // c = b^2
 
-  field d, e, f;
+  Field d, e, f;
   field_add(r->X, p->X, b);         // t0 = X1 + b
   field_sq(r->Y, r->X);             // t1 = t0^2
   field_sub(r->Z, r->Y, a);         // t2 = t1 - a
   field_sub(r->X, r->Z, c);         // t3 = t2 - c
   field_add(d, r->X, r->X);         // d = 2 * t3
-  field_mul(e, field_three, a);     // e = 3 * a
+  field_mul(e, FIELD_THREE, a);     // e = 3 * a
   field_sq(f, e);                   // f = e^2
 
   field_add(r->Y, d, d);            // t4 = 2 * d
   field_sub(r->X, f, r->Y);         // X = f - t4
 
   field_sub(r->Y, d, r->X);         // t5 = d - X
-  field_mul(f, field_eight, c);     // t6 = 8 * c
+  field_mul(f, FIELD_EIGHT, c);     // t6 = 8 * c
   field_mul(r->Z, e, r->Y);         // t7 = e * t5
   field_sub(r->Y, r->Z, f);         // Y = t7 - t6
 
@@ -281,8 +280,8 @@ void group_dbl(group *r, const group *p) {
 
 // https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/addition/add-2007-bl.op3
 // cost 11M + 5S + 9add + 4*2
-void group_add(group *r, const group *p, const group *q) {
-
+void group_add(Group *r, const Group *p, const Group *q)
+{
   if (is_zero(p)) {
     *r = *q;
     return;
@@ -297,11 +296,11 @@ void group_add(group *r, const group *p, const group *q) {
     return group_dbl(r, p);
   }
 
-  field z1z1, z2z2;
+  Field z1z1, z2z2;
   field_sq(z1z1, p->Z);         // Z1Z1 = Z1^2
   field_sq(z2z2, q->Z);         // Z2Z2 = Z2^2
 
-  field u1, u2, s1, s2;
+  Field u1, u2, s1, s2;
   field_mul(u1, p->X, z2z2);    // u1 = x1 * z2z2
   field_mul(u2, q->X, z1z1);    // u2 = x2 * z1z1
   field_mul(r->X, q->Z, z2z2);  // t0 = z2 * z2z2
@@ -309,7 +308,7 @@ void group_add(group *r, const group *p, const group *q) {
   field_mul(r->Y, p->Z, z1z1);  // t1 = z1 * z1z1
   field_mul(s2, q->Y, r->Y);    // s2 = y2 * t1
 
-  field h, i, j, w, v;
+  Field h, i, j, w, v;
   field_sub(h, u2, u1);         // h = u2 - u1
   field_add(r->Z, h, h);        // t2 = 2 * h
   field_sq(i, r->Z);            // i = t2^2
@@ -342,8 +341,8 @@ void group_add(group *r, const group *p, const group *q) {
 // https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/addition/madd-2007-bl.op3
 // for p = (X1, Y1, Z1), q = (X2, Y2, Z2); assumes Z2 = 1
 // cost 7M + 4S + 9add + 3*2 + 1*4 ?
-void group_madd(group *r, const group *p, const group *q) {
-
+void group_madd(Group *r, const Group *p, const Group *q)
+{
   if (is_zero(p)) {
     *r = *q;
     return;
@@ -353,20 +352,20 @@ void group_madd(group *r, const group *p, const group *q) {
     return;
   }
 
-  field z1z1, u2;
+  Field z1z1, u2;
   field_sq(z1z1, p->Z);             // z1z1 = Z1^2
   field_mul(u2, q->X, z1z1);        // u2 = X2 * z1z1
 
-  field s2;
+  Field s2;
   field_mul(r->X, p->Z, z1z1);      // t0 = Z1 * z1z1
   field_mul(s2, q->Y, r->X);        // s2 = Y2 * t0
 
-  field h, hh;
+  Field h, hh;
   field_sub(h, u2, p->X);           // h = u2 - X1
   field_sq(hh, h);                  // hh = h^2
 
-  field j, w, v;
-  field_mul(r->X, field_four, hh);  // i = 4 * hh
+  Field j, w, v;
+  field_mul(r->X, FIELD_FOUR, hh);  // i = 4 * hh
   field_mul(j, h, r->X);            // j = h * i
   field_sub(r->Y, s2, p->Y);        // t1 = s2 - Y1
   field_add(w, r->Y, r->Y);         // w = 2 * t1
@@ -392,19 +391,20 @@ void group_madd(group *r, const group *p, const group *q) {
   field_sub(r->Z, w, hh);           // (Z1 + h)^2 - Z1Z1 - hh = t11 - hh
 }
 
-void group_scalar_mul(group *r, const scalar k, const group *p) {
+void group_scalar_mul(Group *r, const Scalar k, const Group *p)
+{
 
-  *r = group_zero;
+  *r = GROUP_ZERO;
   if (is_zero(p)) {
     return;
   }
-  if (scalar_eq(k, scalar_zero)) {
+  if (scalar_eq(k, SCALAR_ZERO)) {
     return;
   }
-  group r1 = *p;
-  for (unsigned int i = scalar_offset; i < scalar_bits; i++) {
+  Group r1 = *p;
+  for (unsigned int i = SCALAR_OFFSET; i < SCALAR_BITS; i++) {
     unsigned int di = k[i / 8] & (1 << (7 - (i % 8)));
-    group q0;
+    Group q0;
     if (di == 0) {
       group_add(&q0, r, &r1); // r1 = r0 + r1
       r1 = q0;
@@ -420,50 +420,114 @@ void group_scalar_mul(group *r, const scalar k, const group *p) {
   return;
 }
 
-void affine_scalar_mul(affine *r, const scalar k, const affine *p) {
-  group pp, pr;
+void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p)
+{
+  Group pp, pr;
   affine_to_projective(&pp, p);
   group_scalar_mul(&pr, k, &pp);
   projective_to_affine(r, &pr);
   return;
 }
 
+inline unsigned int is_odd(const Field y)
+{
+    return y[FIELD_BYTES - 1] & 0x01;
+}
+
 // Ledger uses:
-// - BIP 39 to generate and interpret the master seed, which
-//   produces the 24 words shown on the device at startup.
-// - BIP 32 for HD key derivation (using the child key derivation function)
-// - BIP 44 for HD account derivation (so e.g. btc and coda keys don't clash)
+// - BIP39 to generate and interpret the master seed, which produces
+//   the 24 words shown on the device at startup.
+// - BIP32 for HD key derivation (using the child key derivation
+//   function)
+// - BIP44 for HD account derivation (so e.g. btc and coda keys don't
+//   clash)
+void generate_keypair(uint32_t account, Keypair *keypair)
+{
+    if (!keypair) {
+        THROW(INVALID_PARAMETER);
+    }
 
-void generate_keypair(unsigned int index, affine *pub_key, scalar priv_key) {
+    const uint32_t bip32_path[BIP32_PATH_LEN] = {
+        44 | BIP32_HARDENED_OFFSET,
+        49370 | BIP32_HARDENED_OFFSET,
+        account | BIP32_HARDENED_OFFSET,
+        0 | BIP32_HARDENED_OFFSET,
+        0 | BIP32_HARDENED_OFFSET
+    };
 
-  unsigned int bip32_path[5];
-  unsigned char chain[32];
+    os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path, BIP32_PATH_LEN, keypair->priv, NULL);
 
-  // bip32_path[0] = 44' because we use BIP/SLIP44, [1] = 49370' = 0xc0da
-  // these must match those found in Makefile
-  bip32_path[0] = 44 | 0x80000000;
-  bip32_path[1] = 49370 | 0x80000000;
-  bip32_path[2] = index | 0x80000000;
-  bip32_path[3] = 0;
-  bip32_path[4] = 0;
+    // Make sure the private key is in [0, p)
+    //
+    // Note: Coda does rejection sampling to obtain a private key in
+    // [0, p), where the field modulus
+    //
+    //     p = 28948022309329048855892746252171976963322203655954433126947083963168578338817
+    //
+    // Due to constraints, this implementation take a different
+    // approach and just unsets the top two bits of the 256bit bip44
+    // secret, so
+    //
+    //     max = 28948022309329048855892746252171976963317496166410141009864396001978282409983.
+    //
+    // If p < max then we could still generate invalid private keys
+    // (although it's highly unlikely), but
+    //
+    //     p - max = 4707489544292117082687961190295928834
+    //
+    // Thus, we cannot generate invalid private keys and instead lose an
+    // insignificant amount of entropy.
 
-  os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path,
-                             sizeof(bip32_path) / sizeof(bip32_path[0]),
-                             priv_key, chain);
-  os_memcpy(priv_key + 32, chain, 16);
-  affine_scalar_mul(pub_key, priv_key, &affine_one);
+    keypair->priv[0] &= 0x3f; // drop first two bits
+
+    affine_scalar_mul(&keypair->pub, keypair->priv, &AFFINE_ONE);
+
+    return;
+}
+
+void get_address(const Affine *pub_key, char *address, size_t len)
+{
+    if (len != CODA_ADDRESS_LEN) {
+        THROW(INVALID_PARAMETER);
+    }
+
+    struct bytes {
+        uint8_t version;
+        uint8_t payload[35];
+        uint8_t checksum[4];
+    } raw;
+
+    raw.version = 0xcb;    // version for base58 check
+    raw.payload[0] = 0x01; // non_zero_curve_point version
+    raw.payload[1] = 0x01; // compressed_poly version
+    // reversed x-coordinate
+    for (size_t i = 0; i < sizeof(pub_key->x); i++) {
+        raw.payload[i + 2] = pub_key->x[sizeof(pub_key->x) - i - 1];
+    }
+    // y-coordinate parity
+    raw.payload[34] = is_odd(pub_key->y);
+
+    uint8_t hash1[32];
+    cx_hash_sha256((const unsigned char *)&raw, 36, hash1, 32);
+
+    uint8_t hash2[32];
+    cx_hash_sha256(hash1, 32, hash2, 32);
+    os_memmove(raw.checksum, hash2, 4);
+
+    // Encode as address
+    encodeBase58((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
+    address[CODA_ADDRESS_LEN - 1] = '\0';
+}
+
+void generate_pubkey(Affine *pub_key, const Scalar priv_key)
+{
+  affine_scalar_mul(pub_key, priv_key, &AFFINE_ONE);
   return;
 }
 
-void generate_pubkey(affine *pub_key, const scalar priv_key) {
-  affine_scalar_mul(pub_key, priv_key, &affine_one);
-  return;
-}
-
-inline unsigned int is_odd(const field y) { return (y[field_bytes - 1] & 1); }
-
-void schnorr_hash(scalar out, const scalar in0, const scalar in1,
-                  const scalar in2, const scalar in3, const scalar in4) {
+void schnorr_hash(Scalar out, const Scalar in0, const Scalar in1,
+                  const Scalar in2, const Scalar in3, const Scalar in4)
+{
 
   /*
   // state after applying {{0x2a, 0x2a, 0x2a, 0x2a, 0x2a, 0x2a, 0x2a, 0x65,
@@ -471,7 +535,7 @@ void schnorr_hash(scalar out, const scalar in0, const scalar in1,
   {0}};
   */
 
-  state pos = {
+  State pos = {
       {0x10, 0x3b, 0x9c, 0x65, 0x52, 0x8d, 0x48, 0xea,
        0xc5, 0x1d, 0x8f, 0xda, 0x9a, 0xb0, 0xf6, 0x24,
        0x75, 0x2b, 0x80, 0x22, 0xf9, 0x1a, 0x35, 0x23,
@@ -491,26 +555,26 @@ void schnorr_hash(scalar out, const scalar in0, const scalar in1,
   return;
 }
 
-void sign(field rx, scalar s, const affine *public_key,
-          const scalar private_key, const scalar msgx, const scalar msgm) {
-  scalar k_prime;
+void sign(Field rx, Scalar s, const Affine *public_key,
+          const Scalar private_key, const Scalar msgx, const Scalar msgm)
+{
+  Scalar k_prime;
   /* rx is G_io_apdu_buffer so we can take 192 bytes from it */
   {
-    affine *r;
-    r = (affine *)rx;
+    Affine *r;
+    r = (Affine *)rx;
     schnorr_hash(k_prime, msgx, msgm, public_key->x, public_key->y,
                  private_key);                    // k = hash(m || pkx || pky || sk)
-    affine_scalar_mul(r, k_prime, &affine_one);   // r = k*g
+    affine_scalar_mul(r, k_prime, &AFFINE_ONE);   // r = k*g
 
     if (is_odd(r->y)) {
-      scalar_sub(k_prime, group_order, k_prime);  // if ry is odd, k = - k'
+      scalar_sub(k_prime, GROUP_ORDER, k_prime);  // if ry is odd, k = - k'
     }
     /* store so we don't need affine *r anymore */
-    os_memcpy(rx, r->x, field_bytes);
+    os_memcpy(rx, r->x, FIELD_BYTES);
   }
-  schnorr_hash(s, msgx, public_key->x, public_key->y, rx,
-               msgm);                             // e = hash(x || pkx || pky || xr || m)
-  os_memcpy(s, scalar_zero, (scalar_bytes - 16)); // use 128 LSB (128/8 = 16) as challenge
+  schnorr_hash(s, msgx, public_key->x, public_key->y, rx, msgm); // e = hash(x || pkx || pky || xr || m)
+  os_memcpy(s, SCALAR_ZERO, SCALAR_BYTES - 16);   // use 128 LSB (128/8 = 16) as challenge
   scalar_mul(s, s, private_key);                  // e*sk
   scalar_add(s, k_prime, s);                      // k + e*sk
   return;

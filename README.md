@@ -32,6 +32,37 @@ Remove the app from the device:
 make delete
 ```
 
+## Unit tests
+
+1. Initialize your Ledger test hardware with the following secret phrase
+
+```
+course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+```
+
+2. Build and install the Coda unit tests app
+
+```bash
+make clean
+make USER_DEFINES=UNIT_TESTS load
+```
+
+3. Start the unit tests app on your Ledger device
+
+This app replaces the normal Coda app and will show
+
+```
+Coda
+unit tests
+```
+
+once loaded.
+
+4. Run the unit tests
+
+```bash
+./tests/unit_tests.py
+```
 
 ## Example of Ledger wallet functionality
 

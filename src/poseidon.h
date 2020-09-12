@@ -11,25 +11,22 @@
  * Poseidon splits the full rounds into two, putting half before the parital
  * rounds are run, and the other half after. We have :
  * full rounds = 8
- * partial = 30, 
- * meaning that the rounds total 38. 
+ * partial = 30,
+ * meaning that the rounds total 38.
  * poseidon.c handles splitting the partial rounds in half and execution order.
  ********************************************************************************/
 
-#ifndef POSEIDON
-#define POSEIDON
+#pragma once
 
 #include "crypto.h"
 
-#define rounds 38
-#define full_rounds 8
-#define partial_rounds 30
-#define sponge_size 3
+#define ROUNDS 38
+#define FULL_ROUNDS 8
+#define PARTIAL_ROUNDS 30
+#define SPONGE_SIZE 3
 
-typedef scalar state[sponge_size];
+typedef Scalar State[SPONGE_SIZE];
 
-void poseidon_1in(state s, const scalar in);
-void poseidon_2in(state s, const scalar in0, const scalar in1);
-void poseidon_digest(scalar out, const state s);
-
-#endif // POSEIDON
+void poseidon_1in(State s, const Scalar in);
+void poseidon_2in(State s, const Scalar in0, const Scalar in1);
+void poseidon_digest(Scalar out, const State s);

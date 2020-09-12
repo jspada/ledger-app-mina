@@ -1,45 +1,54 @@
-#ifndef CODA_CRYPTO
-#define CODA_CRYPTO
+#pragma once
 
-#define field_bytes   32
-#define scalar_bytes  32
-#define group_bytes   96
-#define affine_bytes  64
-#define scalar_bits   256   // scalar_bytes * 8
-#define scalar_offset 2     // scalars have 382 ( = 384 - 2 ) used bits
+#include <stdint.h>
+#include <stddef.h>
 
-typedef unsigned char field[field_bytes];
-typedef unsigned char scalar[scalar_bytes];
+#define BIP32_PATH_LEN 5
+#define BIP32_HARDENED_OFFSET 0x80000000
+
+#define FIELD_BYTES   32
+#define SCALAR_BYTES  32
+#define SCALAR_BITS   256
+#define SCALAR_OFFSET 2   // Scalars have 254 used bits
+
+#define CODA_ADDRESS_LEN 56 // includes null-byte
+
+typedef uint8_t Field[FIELD_BYTES];
+typedef uint8_t Scalar[SCALAR_BYTES];
 
 typedef struct group {
-  field X;
-  field Y;
-  field Z;
-} group;
+    Field X;
+    Field Y;
+    Field Z;
+} Group;
 
 typedef struct affine {
-  field x;
-  field y;
-} affine;
+    Field x;
+    Field y;
+} Affine;
 
 typedef struct signature {
-  field rx;
-  scalar s;
-} signature;
+    Field rx;
+    Scalar s;
+} Signature;
 
-void field_add(field c, const field a, const field b);
-void field_mul(field c, const field a, const field b);
-void field_pow(field c, const field a, const field e);
-void group_add(group *c, const group *a, const group *b);
-void group_dbl(group *c, const group *a);
-void group_scalar_mul(group *r, const scalar k, const group *p);
-void affine_scalar_mul(affine *r, const scalar k, const affine *p);
-void projective_to_affine(affine *p, const group *r);
+typedef struct keypair {
+    Affine pub;
+    Scalar priv;
+} Keypair;
 
-void generate_pubkey(affine *pub_key, const scalar priv_key);
-void generate_keypair(unsigned int index, affine *pub_key, scalar priv_key);
+void field_add(Field c, const Field a, const Field b);
+void field_mul(Field c, const Field a, const Field b);
+void field_pow(Field c, const Field a, const Field e);
+void group_add(Group *c, const Group *a, const Group *b);
+void group_dbl(Group *c, const Group *a);
+void group_scalar_mul(Group *r, const Scalar k, const Group *p);
+void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p);
+void projective_to_affine(Affine *p, const Group *r);
 
-void sign(field rx, scalar s, const affine *public_key, const scalar private_key,
-    const scalar msgx, const scalar msgm);
+void generate_pubkey(Affine *pub_key, const Scalar priv_key);
+void generate_keypair(uint32_t account, Keypair *keypair);
+void get_address(const Affine *pub_key, char *address, size_t len);
 
-#endif // CODA_CRYPTO
+void sign(Field rx, Scalar s, const Affine *pub_key, const Scalar priv_key,
+          const Scalar msgx, const Scalar msgm);
