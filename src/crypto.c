@@ -7,7 +7,7 @@
  *  - projective_to_affine
  *  - generate_pubkey, generate_keypair
  *  - sign. Produces a schnorr signature according to the specification here :
- *    https://github.com/CodaProtocol/coda/blob/develop/docs/specs/signatures/description.md
+ *    https://github.com/MinaProtocol/mina/blob/develop/docs/specs/signatures/description.md
  *
  * E1/Fp : y^2 = x^3 + 5
  * Tweedle Fp = 28948022309329048855892746252171976963322203655955319056773317069363642105857 (Dum, 0xe2, group order)
@@ -393,7 +393,6 @@ void group_madd(Group *r, const Group *p, const Group *q)
 
 void group_scalar_mul(Group *r, const Scalar k, const Group *p)
 {
-
   *r = GROUP_ZERO;
   if (is_zero(p)) {
     return;
@@ -439,7 +438,7 @@ inline unsigned int is_odd(const Field y)
 //   the 24 words shown on the device at startup.
 // - BIP32 for HD key derivation (using the child key derivation
 //   function)
-// - BIP44 for HD account derivation (so e.g. btc and coda keys don't
+// - BIP44 for HD account derivation (so e.g. btc and mina keys don't
 //   clash)
 void generate_keypair(uint32_t account, Keypair *keypair)
 {
@@ -459,7 +458,7 @@ void generate_keypair(uint32_t account, Keypair *keypair)
 
     // Make sure the private key is in [0, p)
     //
-    // Note: Coda does rejection sampling to obtain a private key in
+    // Note: Mina does rejection sampling to obtain a private key in
     // [0, p), where the field modulus
     //
     //     p = 28948022309329048855892746252171976963322203655954433126947083963168578338817
@@ -487,7 +486,7 @@ void generate_keypair(uint32_t account, Keypair *keypair)
 
 void get_address(const Affine *pub_key, char *address, size_t len)
 {
-    if (len != CODA_ADDRESS_LEN) {
+    if (len != MINA_ADDRESS_LEN) {
         THROW(INVALID_PARAMETER);
     }
 
@@ -516,7 +515,7 @@ void get_address(const Affine *pub_key, char *address, size_t len)
 
     // Encode as address
     encodeBase58((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
-    address[CODA_ADDRESS_LEN - 1] = '\0';
+    address[MINA_ADDRESS_LEN - 1] = '\0';
 }
 
 void generate_pubkey(Affine *pub_key, const Scalar priv_key)

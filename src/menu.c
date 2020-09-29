@@ -5,8 +5,8 @@ UX_STEP_NOCB(
     ux_idle_flow_1_step,
     pnn,
     {
-      &C_coda_logo,
-      "Coda",
+      &C_mina_logo,
+      "Mina",
       "unit tests",
     });
 #else
@@ -14,8 +14,8 @@ UX_STEP_NOCB(
     ux_idle_flow_1_step,
     pnn,
     {
-      &C_coda_logo,
-      "Coda",
+      &C_mina_logo,
+      "Mina",
       "is ready",
     });
 #endif

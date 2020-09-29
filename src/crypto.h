@@ -11,7 +11,7 @@
 #define SCALAR_BITS   256
 #define SCALAR_OFFSET 2   // Scalars have 254 used bits
 
-#define CODA_ADDRESS_LEN 56 // includes null-byte
+#define MINA_ADDRESS_LEN 56 // includes null-byte
 
 typedef uint8_t Field[FIELD_BYTES];
 typedef uint8_t Scalar[SCALAR_BYTES];

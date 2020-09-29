@@ -26,15 +26,15 @@ APPVERSION_M=1
 APPVERSION_N=0
 APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-APPNAME = "Coda"
+APPNAME = "Mina"
 
 DEFINES += $(DEFINES_LIB) $(USER_DEFINES)
 
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
-	ICONNAME=icons/nanox_app_coda.gif
+	ICONNAME=icons/nanox_app_mina.gif
 else
-	ICONNAME=icons/nanos_app_coda.gif
+	ICONNAME=icons/nanos_app_mina.gif
 endif
 
 
@@ -149,7 +149,7 @@ release: all
 	export APP_LOAD_PARAMS_EVALUATED="$(shell printf '\\"%s\\" ' $(APP_LOAD_PARAMS))"; \
 	cat load-template.sh | envsubst > load.sh
 	chmod +x load.sh
-	tar -zcf coda-ledger-app-$(APPVERSION).tar.gz load.sh bin/app.hex
+	tar -zcf mina-ledger-app-$(APPVERSION).tar.gz load.sh bin/app.hex
 	rm load.sh
 
 # import generic rules from the sdk
@@ -161,4 +161,4 @@ dep/%.d: %.c Makefile
 
 
 listvariants:
-	@echo VARIANTS COIN coda
+	@echo VARIANTS COIN mina

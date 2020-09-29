@@ -5,13 +5,13 @@
 #include "crypto.h"
 
 static uint32_t account = 0;
-static char address[CODA_ADDRESS_LEN];
+static char address[MINA_ADDRESS_LEN];
 
 static uint8_t set_result_get_address() {
     uint8_t tx = 0;
-    assert(strlen(address) == CODA_ADDRESS_LEN - 1);
-    os_memmove(G_io_apdu_buffer + tx, address, CODA_ADDRESS_LEN);
-    tx += CODA_ADDRESS_LEN;
+    assert(strlen(address) == MINA_ADDRESS_LEN - 1);
+    os_memmove(G_io_apdu_buffer + tx, address, MINA_ADDRESS_LEN);
+    tx += MINA_ADDRESS_LEN;
     return tx;
 }
 

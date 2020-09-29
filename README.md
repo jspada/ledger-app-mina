@@ -1,7 +1,7 @@
-# ledger-app-coda
+# ledger-app-mina
 
 ## Overview
-This is the Coda app for the Nano S/X hardware wallet.
+This is the Mina app for the Nano S/X hardware wallet.
 
 ## Building and installing
 To build and install the app on your Ledger Nano S you must set up the Ledger Nano S build environments. Please follow the Getting Started instructions at [here](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html).
@@ -40,7 +40,7 @@ make delete
 course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
 ```
 
-2. Build and install the Coda unit tests app
+2. Build and install the Mina unit tests app
 
 ```bash
 make clean
@@ -49,10 +49,10 @@ make USER_DEFINES=UNIT_TESTS load
 
 3. Start the unit tests app on your Ledger device
 
-This app replaces the normal Coda app and will show
+This app replaces the normal Mina app and will show
 
 ```
-Coda
+Mina
 unit tests
 ```
 
