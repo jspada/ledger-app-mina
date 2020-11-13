@@ -106,6 +106,10 @@ char *amountToString(char *buf, size_t len, uint64_t amount)
     }
     characteristic_len = characteristic_len ? characteristic_len : 1;
     size_t total_len = characteristic_len + 1 + mantissa_len + 1;
+    if (total_len > len) {
+        *buf = '\0';
+        return buf;
+    }
 
     char *end = buf + total_len - 1;
     *end = '\0';
