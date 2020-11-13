@@ -13,6 +13,8 @@
 
 #define MINA_ADDRESS_LEN 56 // includes null-byte
 
+#define COIN 1000000000ULL
+
 typedef uint8_t Field[FIELD_BYTES];
 typedef uint8_t Scalar[SCALAR_BYTES];
 
@@ -48,7 +50,7 @@ void projective_to_affine(Affine *p, const Group *r);
 
 void generate_pubkey(Affine *pub_key, const Scalar priv_key);
 void generate_keypair(uint32_t account, Keypair *keypair);
-void get_address(const Affine *pub_key, char *address, size_t len);
+int get_address(const Affine *pub_key, char *address, size_t len);
 
 void sign(Field rx, Scalar s, const Affine *pub_key, const Scalar priv_key,
           const Scalar msgx, const Scalar msgm);

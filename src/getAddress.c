@@ -24,7 +24,17 @@ static void gen_address()
             TRY {
                 generate_keypair(account, &kp);
 
-                get_address(&kp.pub, address, sizeof(address));
+                int result = get_address(&kp.pub, address, sizeof(address));
+                switch (result) {
+                    case -2:
+                        THROW(EXCEPTION_OVERFLOW);
+
+                    case -1:
+                        THROW(INVALID_PARAMETER);
+
+                    default:
+                        ; // SUCCESS
+                }
 
                 #ifdef UNIT_TESTS
                 sendResponse(set_result_get_address(), true);

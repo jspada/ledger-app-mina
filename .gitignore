@@ -1,0 +1,11 @@
+bin/
+debug/
+dep/
+dev-env/
+obj/
+src/glyphs.c
+src/glyphs.h
+*.o
+*~
+tests/utils_tests
+

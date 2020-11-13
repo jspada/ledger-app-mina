@@ -14,9 +14,12 @@
  * Tweedle Fq = 28948022309329048855892746252171976963322203655954433126947083963168578338817 (Dee, 0xd4, field modulus)
  ************************************************************************************************************************/
 
+#include <os.h>
+
 #include "crypto.h"
 #include "poseidon.h"
 #include "utils.h"
+#include "globals.h"
 
 // scalar field Fq
 static const Field FIELD_MODULUS = {
@@ -484,7 +487,7 @@ void generate_keypair(uint32_t account, Keypair *keypair)
     return;
 }
 
-void get_address(const Affine *pub_key, char *address, size_t len)
+int get_address(const Affine *pub_key, char *address, size_t len)
 {
     if (len != MINA_ADDRESS_LEN) {
         THROW(INVALID_PARAMETER);
@@ -514,8 +517,15 @@ void get_address(const Affine *pub_key, char *address, size_t len)
     os_memmove(raw.checksum, hash2, 4);
 
     // Encode as address
-    encodeBase58((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
-    address[MINA_ADDRESS_LEN - 1] = '\0';
+    int result = encodeBase58((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
+    if (result < 0) {
+        address[0] = '\0';
+    }
+    else {
+        address[MINA_ADDRESS_LEN - 1] = '\0';
+    }
+
+    return result;
 }
 
 void generate_pubkey(Affine *pub_key, const Scalar priv_key)

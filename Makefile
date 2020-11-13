@@ -41,7 +41,7 @@ endif
 ################
 # Default rule #
 ################
-all: default
+all: default unit_tests
 
 ############
 # Platform #
@@ -151,6 +151,9 @@ release: all
 	chmod +x load.sh
 	tar -zcf mina-ledger-app-$(APPVERSION).tar.gz load.sh bin/app.hex
 	rm load.sh
+
+unit_tests: tests
+	$(MAKE) --directory=$<
 
 # import generic rules from the sdk
 include $(BOLOS_SDK)/Makefile.rules
