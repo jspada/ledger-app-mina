@@ -55,7 +55,7 @@ try:
                                      data=json.dumps(construction_metadata_request)).json()
                 if "metadata" not in resp:
                         print("Failed to get metadata")
-                        raise
+                        raise Exception("Unable to connect to Mina rosetta port ({})".format(args.rosetta_server))
                 nonce = resp["metadata"]["nonce"];
                 fee = float(resp["suggested_fee"][0]["value"])/COIN
                 if args.fee is not None:
@@ -150,6 +150,5 @@ except ledgerblue.CommException as ex:
 except AssertionError:
         raise
 except Exception as ex:
-        raise
-        print("Error {}".format(ex))
+        print("Error: {}".format(ex))
         sys.exit(233)

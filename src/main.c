@@ -43,6 +43,7 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                 THROW(0x6E00);
             }
 
+            uint32_t dataLength = readUint32BE(G_io_apdu_buffer + OFFSET_LC);
             switch (G_io_apdu_buffer[OFFSET_INS]) {
 
                 case INS_GET_APP_CONFIGURATION:
@@ -54,11 +55,11 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                     break;
 
                 case INS_GET_ADDR:
-                    handleGetAddress(G_io_apdu_buffer[OFFSET_P1], G_io_apdu_buffer[OFFSET_P2], G_io_apdu_buffer + OFFSET_CDATA, G_io_apdu_buffer[OFFSET_LC], flags, tx);
+                    handleGetAddress(G_io_apdu_buffer[OFFSET_P1], G_io_apdu_buffer[OFFSET_P2], G_io_apdu_buffer + OFFSET_CDATA, dataLength, flags, tx);
                     break;
 
             case INS_SIGN_PAYMENT_TX:
-                    handleSignPaymentTx(G_io_apdu_buffer[OFFSET_P1], G_io_apdu_buffer[OFFSET_P2], G_io_apdu_buffer + OFFSET_CDATA, G_io_apdu_buffer[OFFSET_LC], flags, tx);
+                    handleSignPaymentTx(G_io_apdu_buffer[OFFSET_P1], G_io_apdu_buffer[OFFSET_P2], G_io_apdu_buffer + OFFSET_CDATA, dataLength, flags, tx);
                     break;
 
                 default:

@@ -5,6 +5,7 @@
  * scalar field element, to scale the elliptic curve point. We do all of the
  * computation in this file in the base field, but output the result as a scalar.
  ********************************************************************************/
+#include <os.h>
 
 #include "crypto.h"
 #include "poseidon.h"

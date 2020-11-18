@@ -52,5 +52,4 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key);
 void generate_keypair(uint32_t account, Keypair *keypair);
 int get_address(const Affine *pub_key, char *address, size_t len);
 
-void sign(Field rx, Scalar s, const Affine *pub_key, const Scalar priv_key,
-          const Scalar msgx, const Scalar msgm);
+void sign(const Keypair *kp, const Scalar msgx, const Scalar msgm, Signature *sig);

@@ -44,7 +44,7 @@ int main()
    assert(strcmp(amountToString(buf, sizeof(buf), 314159265359), "314.159265359") == 0);
    assert(strcmp(amountToString(buf, sizeof(buf), 1618033988750000), "1618033.98875") == 0);
 
-   printf("SUCCESS!\n");
+   printf("Utils tests completed successfully!\n");
 
    return 0;
 }

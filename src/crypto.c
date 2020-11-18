@@ -564,27 +564,25 @@ void schnorr_hash(Scalar out, const Scalar in0, const Scalar in1,
   return;
 }
 
-void sign(Field rx, Scalar s, const Affine *public_key,
-          const Scalar private_key, const Scalar msgx, const Scalar msgm)
+void sign(const Keypair *kp, const Scalar msgx, const Scalar msgm, Signature *sig)
 {
-  Scalar k_prime;
-  /* rx is G_io_apdu_buffer so we can take 192 bytes from it */
-  {
-    Affine *r;
-    r = (Affine *)rx;
-    schnorr_hash(k_prime, msgx, msgm, public_key->x, public_key->y,
-                 private_key);                    // k = hash(m || pkx || pky || sk)
-    affine_scalar_mul(r, k_prime, &AFFINE_ONE);   // r = k*g
+    Scalar k_prime;
+    /* rx is G_io_apdu_buffer so we can take 192 bytes from it */
+    {
+        Affine *r;
+        r = (Affine *)sig->rx;
+        schnorr_hash(k_prime, msgx, msgm, kp->pub.x, kp->pub.y, kp->priv); // k = hash(m || pkx || pky || sk)
+        affine_scalar_mul(r, k_prime, &AFFINE_ONE);                        // r = k*g
 
-    if (is_odd(r->y)) {
-      scalar_sub(k_prime, GROUP_ORDER, k_prime);  // if ry is odd, k = - k'
+        if (is_odd(r->y)) {
+            scalar_sub(k_prime, GROUP_ORDER, k_prime); // if ry is odd, k = - k'
+        }
+        /* store so we don't need affine *r anymore */
+        os_memcpy(sig->rx, r->x, FIELD_BYTES);
     }
-    /* store so we don't need affine *r anymore */
-    os_memcpy(rx, r->x, FIELD_BYTES);
-  }
-  schnorr_hash(s, msgx, public_key->x, public_key->y, rx, msgm); // e = hash(x || pkx || pky || xr || m)
-  os_memcpy(s, SCALAR_ZERO, SCALAR_BYTES - 16);   // use 128 LSB (128/8 = 16) as challenge
-  scalar_mul(s, s, private_key);                  // e*sk
-  scalar_add(s, k_prime, s);                      // k + e*sk
-  return;
+    schnorr_hash(sig->s, msgx, kp->pub.x, kp->pub.y, sig->rx, msgm); // e = hash(x || pkx || pky || xr || m)
+    os_memcpy(sig->s, SCALAR_ZERO, SCALAR_BYTES - 16);               // use 128 LSB (128/8 = 16) as challenge
+    scalar_mul(sig->s, sig->s, kp->priv);                            // e*sk
+    scalar_add(sig->s, k_prime, sig->s);                             // k + e*sk
+    return;
 }

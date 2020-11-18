@@ -13,6 +13,70 @@ static char fee[32];
 static char nonce[32];
 static char random_oracle_input[358];
 
+static void sign_transaction()
+{
+    if (random_oracle_input[0] == '\0')
+    {
+        BEGIN_TRY {
+            Keypair kp;
+            TRY {
+                generate_keypair(account, &kp);
+
+                char address[MINA_ADDRESS_LEN] = {};
+                int result = get_address(&kp.pub, address, sizeof(address));
+                switch (result) {
+                    case -2:
+                        THROW(EXCEPTION_OVERFLOW);
+
+                    case -1:
+                        THROW(INVALID_PARAMETER);
+
+                    default:
+                        ; // SUCCESS
+                }
+
+                if (strncmp(address, sender, sizeof(address)) != 0) {
+                    THROW(INVALID_PARAMETER);
+                }
+
+                // Signature sig;
+                // sign(&kp, const Scalar msgx, const Scalar msgm, &sig);
+            }
+            FINALLY {
+                os_memset(kp.priv, 0, sizeof(kp.priv));
+            }
+            END_TRY;
+        }
+    }
+
+    sendResponse((uint8_t)'R', true);
+}
+
+UX_STEP_NOCB_INIT(
+    ux_signing_flow_step,
+    pb,
+    sign_transaction(),
+    {
+        &C_icon_processing,
+        "Done",
+    });
+
+UX_FLOW(ux_signing_flow,
+        &ux_signing_flow_step);
+
+UX_STEP_TIMEOUT(
+    ux_signing_comfort_step,
+    pb,
+    1,
+    ux_signing_flow,
+    {
+      &C_icon_processing,
+      "Signing...",
+    });
+
+UX_FLOW(ux_signing_comfort_flow,
+       &ux_signing_comfort_step);
+
 UX_STEP_NOCB(
     ux_sign_payment_tx_flow_1_step,
     bnnn_paging,
@@ -51,7 +115,7 @@ UX_STEP_NOCB(
 UX_STEP_VALID(
     ux_sign_payment_tx_flow_6_step,
     pb,
-    sendResponse(0, false),
+    ux_flow_init(0, ux_signing_comfort_flow, NULL);,
     {
       &C_icon_validate_14,
       "Approve",
@@ -75,12 +139,17 @@ UX_FLOW(ux_sign_payment_tx_flow,
         &ux_sign_payment_tx_flow_7_step
     );
 
-void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx)
+void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx)
 {
     UNUSED(dataLength);
     UNUSED(p2);
 
     // TODO: Check dataLength is valid
+    if (dataLength != 638) {
+        THROW(INVALID_PARAMETER);
+    }
+
+    random_oracle_input[0] = '\0';
 
     // 0-3: sender_bip44_account
     account = readUint32BE(dataBuffer);

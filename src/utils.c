@@ -1,5 +1,4 @@
 #include <stdbool.h>
-#include <math.h>
 #include <memory.h>
 
 #include "utils.h"
@@ -71,6 +70,7 @@ uint64_t readUint64BE(uint8_t *buffer) {
 
 char *valueToString(char *buf, size_t len, uint64_t value)
 {
+    // don't use log10() on ledger
     size_t digits = 0;
     for (uint64_t val = value; val; val /= 10) {
         digits++;
@@ -100,6 +100,8 @@ char *amountToString(char *buf, size_t len, uint64_t amount)
             break;
         }
     }
+
+    // don't use log10() on ledger
     size_t characteristic_len = 0;
     for (uint64_t value = amount/COIN; value; value /= 10) {
         characteristic_len++;
