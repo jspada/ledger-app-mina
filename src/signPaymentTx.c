@@ -12,14 +12,25 @@ static char amount[32];
 static char fee[32];
 static char nonce[32];
 static char random_oracle_input[358];
+static char signature[65]; // TODO: fix size
+
+static uint8_t set_result_get_signature()
+{
+    uint8_t tx = 0;
+    assert(strlen(signature) == sizeof(signature) - 1);
+    os_memmove(G_io_apdu_buffer + tx, signature, sizeof(signature));
+    tx += sizeof(signature);
+    return tx;
+}
 
 static void sign_transaction()
 {
-    if (random_oracle_input[0] == '\0')
+    if (signature[0] == '\0')
     {
         BEGIN_TRY {
             Keypair kp;
             TRY {
+                #if 0
                 generate_keypair(account, &kp);
 
                 char address[MINA_ADDRESS_LEN] = {};
@@ -38,9 +49,25 @@ static void sign_transaction()
                 if (strncmp(address, sender, sizeof(address)) != 0) {
                     THROW(INVALID_PARAMETER);
                 }
+                #endif
 
                 // Signature sig;
                 // sign(&kp, const Scalar msgx, const Scalar msgm, &sig);
+
+                // Test blake2b
+                uint8_t raw[32] = { };
+                uint8_t hash1[32] = { };
+                cx_blake2b_t blake_ctx;
+                cx_blake2b_init(&blake_ctx, 256);
+                cx_hash(&blake_ctx.header, 0, raw, 0, NULL, 0);
+                cx_hash(&blake_ctx.header, CX_LAST, NULL, 0, hash1, blake_ctx.ctx.outlen);
+
+                // Return blake2b hash */
+                for (size_t i = 0; i < sizeof(hash1); i++) {
+                    snprintf(&signature[i*2], 3, "%02x", hash1[i]);
+                }
+                signature[64] = '\0';
+
             }
             FINALLY {
                 os_memset(kp.priv, 0, sizeof(kp.priv));
@@ -49,7 +76,7 @@ static void sign_transaction()
         }
     }
 
-    sendResponse((uint8_t)'R', true);
+    sendResponse(set_result_get_signature(), true);
 }
 
 UX_STEP_NOCB_INIT(
@@ -149,7 +176,7 @@ void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t d
         THROW(INVALID_PARAMETER);
     }
 
-    random_oracle_input[0] = '\0';
+    signature[0] = '\0';
 
     // 0-3: sender_bip44_account
     account = readUint32BE(dataBuffer);

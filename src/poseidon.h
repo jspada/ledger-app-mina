@@ -20,9 +20,8 @@
 
 #include "crypto.h"
 
-#define ROUNDS 38
-#define FULL_ROUNDS 8
-#define PARTIAL_ROUNDS 30
+#define ROUNDS 64
+#define FULL_ROUNDS 63
 #define SPONGE_SIZE 3
 
 typedef Scalar State[SPONGE_SIZE];

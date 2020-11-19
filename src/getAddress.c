@@ -7,7 +7,8 @@
 static uint32_t account = 0;
 static char address[MINA_ADDRESS_LEN];
 
-static uint8_t set_result_get_address() {
+static uint8_t set_result_get_address()
+{
     uint8_t tx = 0;
     assert(strlen(address) == MINA_ADDRESS_LEN - 1);
     os_memmove(G_io_apdu_buffer + tx, address, MINA_ADDRESS_LEN);

@@ -1,6 +1,5 @@
 #include "globals.h"
-#include "os.h"
-#include "ux.h"
+#include "menu.h"
 
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
@@ -9,7 +8,6 @@ bolos_ux_params_t G_ux_params;
 unsigned int ux_step;
 unsigned int ux_step_count;
 const internalStorage_t N_storage_real;
-
 
 void sendResponse(uint8_t tx, bool approve) {
     G_io_apdu_buffer[tx++] = approve? 0x90 : 0x69;
