@@ -14,7 +14,7 @@ install prerequisite and switch to a Nano X dev-env:
 sudo apt install python3-venv python3-dev libudev-dev libusb-1.0-0-dev
 
 # (x or s, depending on your device)
-source prepare-devenv.sh x 
+source prepare-devenv.sh x
 ```
 
 Compile and load the app onto the device:
@@ -33,6 +33,10 @@ make delete
 ```
 
 ## Unit tests
+
+There are two types of unit tests: those that run as part of the build
+and those that can be run on the Ledger device.  This section describes
+how to set up and run the on-device unit tests.
 
 1. Initialize your Ledger test hardware with the following secret phrase
 
@@ -64,13 +68,35 @@ once loaded.
 ./tests/unit_tests.py
 ```
 
-## Example of Ledger wallet functionality
+## Command-line wallet
 
-Test functionality:
+This package provides a simple command-line wallet that interfaces
+with your Ledger device and Mina blockchain to allow you to generate
+addresses, sign transaction and submit them to the Mina network.
+
 ```bash
-# (x or s, depending on your device)
-source prepare-devenv.sh x
-python test_example.py --account_number 12345
+$ ./utils/mina-ledger-wallet.py -h
+usage: mina-ledger-wallet.py [-h] {get-address,send-payment} ...
+
+positional arguments:
+  {get-address,send-payment}
+
+optional arguments:
+  -h, --help            show this help message and exit
+```
+
+Example of generating a keypair corresponding to hardware wallet account 1 (BIP44 address /44'/49370'/1/0/0)
+
+```bash
+$ ./utils/mina-ledger-wallet.py get-address 1
+Getting address...
+Received: B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB
+```
+
+Example of sending a payment transaction sending 100.5 Mina from hardware wallet account 1 (B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB) to recipient B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.
+
+```bash
+$ ./utils/mina-ledger-wallet.py send-payment --fee 0.00271828 1 B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g 100.5
 ```
 
 ## Documentation
