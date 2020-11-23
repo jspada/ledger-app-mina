@@ -54,19 +54,16 @@ static void sign_transaction()
                 // Signature sig;
                 // sign(&kp, const Scalar msgx, const Scalar msgm, &sig);
 
-                // Test blake2b
-                uint8_t raw[32] = { };
-                uint8_t hash1[32] = { };
-                cx_blake2b_t blake_ctx;
-                cx_blake2b_init(&blake_ctx, 256);
-                cx_hash(&blake_ctx.header, 0, raw, 0, NULL, 0);
-                cx_hash(&blake_ctx.header, CX_LAST, NULL, 0, hash1, blake_ctx.ctx.outlen);
-
-                // Return blake2b hash */
-                for (size_t i = 0; i < sizeof(hash1); i++) {
-                    snprintf(&signature[i*2], 3, "%02x", hash1[i]);
-                }
-                signature[64] = '\0';
+                // // Test blake2b
+                // uint8_t raw[32] = { };
+                // uint8_t hash1[32] = { };
+                // blake2b_hash(raw, 0, hash1);
+                //
+                // // Return blake2b hash */
+                // for (size_t i = 0; i < sizeof(hash1); i++) {
+                //     snprintf(&signature[i*2], 3, "%02x", hash1[i]);
+                // }
+                // signature[64] = '\0';
 
             }
             FINALLY {

@@ -1413,25 +1413,20 @@ void poseidon_permutation(State s)
     }
 }
 
-// The first step in poseidon is to add the input to the current state. This is
-// a convenience function for when you want to run poseidon with one element as
-// input.
-void poseidon_1in(State s, const Scalar input)
-{
-    field_add(s[0], s[0], input);
-    poseidon_permutation(s);
-}
-
 // Convenience function for when you want to run poseidon with two elements as
 // input.
-void poseidon_2in(State s, const Scalar input0, const Scalar input1)
+void add_chunk(State s, const Scalar input0, const Scalar input1)
 {
     field_add(s[0], s[0], input0);
     field_add(s[1], s[1], input1);
     poseidon_permutation(s);
 }
 
+void poseidon_update(State s, const Scalar *input, size_t len)
+{
+}
+
 // Squeezing poseidon returns the first element of its current state.
 void poseidon_digest(Scalar out, const State s) {
-    os_memcpy(out, s[0], FIELD_BYTES);
+    os_memcpy(out, s[0], sizeof(s[0]));
 }

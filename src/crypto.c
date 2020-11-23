@@ -550,6 +550,14 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key)
     affine_scalar_mul(pub_key, priv_key, &AFFINE_ONE);
 }
 
+void blake2b_hash(uint8_t *input, size_t len, uint8_t output[32])
+{
+    cx_blake2b_t blake_ctx;
+    cx_blake2b_init(&blake_ctx, 256);
+    cx_hash(&blake_ctx.header, 0, input, len, NULL, 0);
+    cx_hash(&blake_ctx.header, CX_LAST, NULL, 0, output, blake_ctx.ctx.outlen);
+}
+
 void schnorr_hash(Scalar out, const Scalar in0, const Scalar in1,
                   const Scalar in2, const Scalar in3, const Scalar in4)
 {
@@ -575,9 +583,9 @@ void schnorr_hash(Scalar out, const Scalar in0, const Scalar in1,
         }
     };
 
-    poseidon_2in(pos, in0, in1);
-    poseidon_2in(pos, in2, in3);
-    poseidon_1in(pos, in4);
+    // poseidon_2in(pos, in0, in1);
+    // poseidon_2in(pos, in2, in3);
+    // poseidon_1in(pos, in4);
     poseidon_digest(out, pos);
 }
 

@@ -85,7 +85,7 @@ optional arguments:
   -h, --help            show this help message and exit
 ```
 
-Example of generating a keypair corresponding to hardware wallet account 1 (BIP44 address /44'/49370'/1/0/0)
+**Get address**
 
 ```bash
 $ ./utils/mina-ledger-wallet.py get-address 1
@@ -93,11 +93,15 @@ Getting address...
 Received: B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB
 ```
 
-Example of sending a payment transaction sending 100.5 Mina from hardware wallet account 1 (B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB) to recipient B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.
+This generates the keypair corresponding to hardware wallet account 1 (BIP44 address /44'/49370'/1/0/0) and returns the corresponding Mina address.
+
+**Send payment**
 
 ```bash
 $ ./utils/mina-ledger-wallet.py send-payment --fee 0.00271828 1 B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g 100.5
 ```
+
+This sends a payment of 100.5 Mina from hardware wallet account 1 (B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB) to recipient B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.
 
 ## Documentation
 This follows the specification available in the [`api.asc`](https://github.com/LedgerHQ/ledger-app-boilerplate/blob/master/doc/api.asc).
