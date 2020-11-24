@@ -23,7 +23,7 @@ def get_address(account_number):
     # P1 0x00   UNUSED
     # P2 0x00   UNUSED
     account = '{:08x}'.format(account_number)
-    apduMessage = 'E0020000' + '{:02x}'.format(len(account) + 1) + account
+    apduMessage = 'E0020000' + '{:08x}'.format(len(account) + 1) + account
     apdu = bytearray.fromhex(apduMessage)
     address = dongle.exchange(apdu)
     return address.decode('utf-8').rstrip('\x00')
@@ -32,25 +32,35 @@ print("Running unit tests")
 
 def run_get_address_tests():
 
-    # private key 01dbc383e924532164a9c8518f781b02c4762aa183e167ecd157d0b251d138c0
-    # public key 2c9761f871a49b5956bfb39dd46b0365aed1af4e2a0a085412b4164e349ffdc4381eeda14f3d4743c9f1a6f712b0bc37bc2ee0cf1e1ebb3dd67e0fbbb10c8be3
-    assert(get_address(0) == "B62qq4FREq1q1DuTSBDEzMbpkXMjcp6p1XogmCVzZL21dawjZa2SS1d")
+    # account 0
+    # private key 3c041039ac9ac5dea94330115aacf6d4780f08d7299a84a6ee2b62599cebb5e6
+    # public key 1e32fca120ee917a3ce10d2198300526c5289f276b2020d77329d38538be2be93011e21673a9e1af4240ecac174770f2db76c646cd5609196421ffaefed46d94
+    assert(get_address(0) == "B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx")
 
-    # private key 2b07a97d8ecc8f7da2cab847aa7b465fa46880661642df802078c29f8236785e
-    # public key 1c42e1ce09937b3c9a6463d11a70dda150377330fdf865cea44717b736918edf19aabedc4cd9475cf43b1057c78790665beda1e30d6548ef2c63975265596878
-    assert(get_address(1) == "B62qqwtcG43GVR1D1cGEvSuAgkTJwpZHToBqKTMX7oqWmr9Xb5R64tB")
+    # account 1
+    # private key 06270f74f8a6f2529f492a3bf112a3806e91e62b8fc3f247569e9a43ba9e8d6e
+    # public key 2e162c0254a378d642a8716fb2a0a45249809b36e69a6146d25a00bc3b0492b625fc3205992bc6b270329bd51787e35f2f79b9311db2888cefb6c04364853988
+    assert(get_address(1) == "B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P")
 
-    # private key 184f5234bfa662076f56cf5faf4a482361dbb7fe8647e100711cac3b7ce0d05a
-    # public key 0bee7a1aabb40cbd84518dbfdaa09b85845b29902d8d77a48bd343682c900c5d2485f565358686d6b01f2cdcaf0b3e09206d37f38a15bc8920de3e375b0729ad
-    assert(get_address(2) == "B62qmaCaYi4bvfVsibkeY4P4cNaGGYc6xU5s1UWvMT26q9ichdCTtkK")
+    # account 2
+    # private key 2943fbbbcf63025456cfcebae3f481462b1e720d0c7d2a10d113fb6b1847cb3d
+    # public key 27f462c09d9d73da6dba3c15ff26706660ff93c1a62c54220b5298fcafaaf0bb047be08f48a8121779023576d98e3679e6cf9ae3e0869e978468f23f7286f9f7
+    assert(get_address(2) == "B62qpkf1jH9sqtZy4kAJHgdChfuRX7SPqoX4Q2ZjJH2YDNWUUd92bxo")
 
-    # private key 231c7f2478a36f51609d1743124d0a15b2d917c989e5fa9b2c4dc4997c807f57
-    # public key 07b96c07a29ea0fd597cf23b62b2870ff2105a7c5e7b266e65a5509eb9cbcf2c31ca66751ee409cdf9f8ebdefad6fd78975d918b63f2c8ebaedeb6da8779627c
-    assert(get_address(3) == "B62qjxS5rkpdtASZzEBeo32yyeVPqjB1RwxNrhmpNmnyGqStzv2FMj9")
+    # account 3
+    # private key 03e97cbf15dba6da23616785886f8cb4ce9ced51f0140261332ee063bb7f17d3
+    # public key 28057358624705e5eb20e72c5aed1e31181345f7247bd3cebd41f3ceb1583b8211fe1925f43f6f063eb47bc136e712ca6e8583846d7f5f85a7a442493d095851
+    assert(get_address(3) == "B62qnpUj6EJGNvhJFMEAmM6skJRg1H37hVsHvPHMXhHeCXfKhSWGkGN")
 
-    # private key 35e02474e94ec3d790684104988ec5bd9c7329c3bf3d630fe28efdc2a49227eb
-    # public key 39eac1c1e50c6324e65b093384763363eae2c52c1512f463777003afbaa21c3318a91f6c7be05943b86cbc9803685f8a893b0cc7f640d9f392c4d3799da7217f
-    assert(get_address(0xc0da) == "B62qkAgPgsUUxMPgVggMYgH6VBLsjwH6adYgZA5bpkKHrRRsjN1EH34")
+    # account 49370
+    # private key 02989a314a65930de289a5578daa03c3410b177e009121574d8730bf8644ab9f
+    # public key 2ce3f026cad6d15845b0d99dfd0286fe85c976ad61a31fddda7d11ce0f2f08c733f4fd49c1797b69f16a14f65a78a99d9630faa30cb7c20aa7fe2165168052dc
+    assert(get_address(49370) == "B62qq8DZP9h5cCKr6ecXY3MqVz1oQuEzJMyZLCbEukCJGS9SuVXK33o")
+
+    # account 12586
+    # private key 1f2c90f146d1035280364cb1a01a89e7586a340972936abd5d72307a0674549c
+    # public key 2969f63c053ea7e49aa985982427822dfe1d09f2e3f43366714c84db3de6e3780bf8cdef3b89c52c47752a58df4b2898705ebfc67434a2dcb035b5e2858ee5b4
+    assert(get_address(0x312a) == "B62qnWKWnUmj3mxUx4UcnQGMMsqwNkHUdgzvhto6Je3LwKSRb7dYqm9")
 
 try:
     if args.kind == "all":

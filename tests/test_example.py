@@ -20,7 +20,7 @@ print("Get address")
 # P1 0x00   UNUSED
 # P2 0x00   UNUSED
 account = '{:08x}'.format(int(args.account_number))
-apduMessage = 'E0020000' + '{:02x}'.format(len(account) + 1) + account
+apduMessage = 'E0020000' + '{:08x}'.format(len(account) + 1) + account
 apdu = bytearray.fromhex(apduMessage)
 address = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
 print('Received: {}'.format(address))
