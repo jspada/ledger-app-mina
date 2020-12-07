@@ -2,12 +2,24 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-uint32_t readUint32BE(uint8_t *buffer);
-uint64_t readUint64BE(uint8_t *buffer);
+#include "crypto.h"
 
-char *amountToString(char *buf, size_t len, uint64_t amount);
-char *valueToString(char *buf, size_t len, uint64_t value);
+#define ARRAY_LEN(array) sizeof(array)/sizeof(array[0])
 
-int encodeBase58(unsigned char *in, unsigned char length,
-                 unsigned char *out, unsigned char maxoutlen);
+uint32_t read_uint32_be(uint8_t *buffer);
+uint64_t read_uint64_be(uint8_t *buffer);
+
+char *amount_to_string(char *buf, size_t len, uint64_t amount);
+char *value_to_string(char *buf, size_t len, uint64_t value);
+void prepare_memo(uint8_t *out, const char *s);
+
+int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
+               unsigned char maxoutlen);
+bool b58_decode(void *bin, size_t *binszp, const char *b58, size_t b58sz);
+
+void packed_bit_array_set(uint8_t *bits, size_t i, bool b);
+bool packed_bit_array_get(uint8_t *bits, size_t i);
+
+void read_public_key_compressed(Compressed* out, const char *pubkeyBase58);

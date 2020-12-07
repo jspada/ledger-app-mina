@@ -4,37 +4,49 @@
 #include "signPaymentTx.h"
 #include "utils.h"
 #include "crypto.h"
+#include "random_oracle_input.h"
 
-static uint32_t account = 0;
-static char sender[MINA_ADDRESS_LEN];
-static char receiver[MINA_ADDRESS_LEN];
-static char amount[32];
-static char fee[32];
-static char nonce[32];
-static char random_oracle_input[358];
-static char signature[65]; // TODO: fix size
+// Account variables
+static uint32_t _account = 0;
+static Keypair  _kp;
+static char     _address[MINA_ADDRESS_LEN];
+
+// Transaction related
+static Transaction _tx;
+static Field       _input_fields[3];
+static uint8_t     _input_bits[TX_BITS_LEN];
+static ROInput     _roinput;
+static Signature   _sig;
+static char        _signature[65];
+
+// UI variables
+static struct ui_t {
+    char sender[MINA_ADDRESS_LEN];
+    char receiver[MINA_ADDRESS_LEN];
+    char amount[32];
+    char fee[32];
+    char nonce[32];
+} _ui;
 
 static uint8_t set_result_get_signature()
 {
     uint8_t tx = 0;
-    assert(strlen(signature) == sizeof(signature) - 1);
-    os_memmove(G_io_apdu_buffer + tx, signature, sizeof(signature));
-    tx += sizeof(signature);
+    os_memmove(G_io_apdu_buffer + tx, _signature, sizeof(_signature));
+    tx += sizeof(_signature);
     return tx;
 }
 
 static void sign_transaction()
 {
-    if (signature[0] == '\0')
+    if (_signature[0] == '\0')
     {
         BEGIN_TRY {
-            Keypair kp;
             TRY {
-                #if 0
-                generate_keypair(account, &kp);
 
-                char address[MINA_ADDRESS_LEN] = {};
-                int result = get_address(&kp.pub, address, sizeof(address));
+                // Get the private key and validate corresponding public key
+                // matches the sender
+                generate_keypair(&_kp, _account);
+                int result = get_address(_address, sizeof(_address), &_kp.pub);
                 switch (result) {
                     case -2:
                         THROW(EXCEPTION_OVERFLOW);
@@ -45,29 +57,26 @@ static void sign_transaction()
                     default:
                         ; // SUCCESS
                 }
-
-                if (strncmp(address, sender, sizeof(address)) != 0) {
+                if (strncmp(_address, _ui.sender, sizeof(_address)) != 0) {
                     THROW(INVALID_PARAMETER);
                 }
-                #endif
 
-                // Signature sig;
-                // sign(&kp, const Scalar msgx, const Scalar msgm, &sig);
+                // Create random oracle input from transaction
+                _roinput.fields = _input_fields;
+                _roinput.fields_capacity = ARRAY_LEN(_input_fields);
+                _roinput.bits = _input_bits;
+                _roinput.bits_capacity = ARRAY_LEN(_input_bits);
+                roinput_from_transaction(&_roinput, &_tx);
 
-                // // Test blake2b
-                // uint8_t raw[32] = { };
-                // uint8_t hash1[32] = { };
-                // blake2b_hash(raw, 0, hash1);
-                //
-                // // Return blake2b hash */
-                // for (size_t i = 0; i < sizeof(hash1); i++) {
-                //     snprintf(&signature[i*2], 3, "%02x", hash1[i]);
-                // }
-                // signature[64] = '\0';
+                sign(&_sig, &_kp, &_roinput);
+                for (size_t i = 0; i < sizeof(_sig.s); i++) {
+                    snprintf(&_signature[i*2], 3, "%02x", _sig.s[i]);
+                }
+                _signature[64] = '\0';
 
             }
             FINALLY {
-                os_memset(kp.priv, 0, sizeof(kp.priv));
+                os_memset((void *)_kp.priv, 0, sizeof(_kp.priv));
             }
             END_TRY;
         }
@@ -106,35 +115,35 @@ UX_STEP_NOCB(
     bnnn_paging,
     {
       .title = "From",
-      .text = sender,
+      .text = _ui.sender,
     });
 UX_STEP_NOCB(
     ux_sign_payment_tx_flow_2_step,
     bnnn_paging,
     {
       .title = "To",
-      .text = receiver,
+      .text = _ui.receiver,
     });
 UX_STEP_NOCB(
     ux_sign_payment_tx_flow_3_step,
     bn,
     {
       .line1 = "Amount",
-      .line2 = amount,
+      .line2 = _ui.amount,
     });
 UX_STEP_NOCB(
     ux_sign_payment_tx_flow_4_step,
     bn,
     {
       .line1 = "Fee",
-      .line2 = fee,
+      .line2 = _ui.fee,
     });
 UX_STEP_NOCB(
     ux_sign_payment_tx_flow_5_step,
     bn,
     {
       .line1 = "Nonce",
-      .line2 = nonce,
+      .line2 = _ui.nonce,
     });
 UX_STEP_VALID(
     ux_sign_payment_tx_flow_6_step,
@@ -163,7 +172,7 @@ UX_FLOW(ux_sign_payment_tx_flow,
         &ux_sign_payment_tx_flow_7_step
     );
 
-void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx)
+void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t dataLength, volatile unsigned int *flags, volatile unsigned int *unused)
 {
     UNUSED(dataLength);
     UNUSED(p2);
@@ -173,30 +182,49 @@ void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t d
         THROW(INVALID_PARAMETER);
     }
 
-    signature[0] = '\0';
+    _signature[0] = '\0';
 
     // 0-3: sender_bip44_account
-    account = readUint32BE(dataBuffer);
+    _account = read_uint32_be(dataBuffer);
 
     // 4-58: sender_address
-    memcpy(sender, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
-    sender[MINA_ADDRESS_LEN - 1] = '\0';
+    memcpy(_ui.sender, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
+    _ui.sender[MINA_ADDRESS_LEN - 1] = '\0';
+    read_public_key_compressed(&_tx.source_pk, _ui.sender);
+
+    // TODO fee_payer
+    read_public_key_compressed(&_tx.fee_payer_pk, _ui.sender);
 
     // 59-113: receiver
-    memcpy(receiver, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
-    receiver[MINA_ADDRESS_LEN - 1] = '\0';
+    memcpy(_ui.receiver, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
+    _ui.receiver[MINA_ADDRESS_LEN - 1] = '\0';
+    read_public_key_compressed(&_tx.receiver_pk, _ui.receiver);
 
-    // 114-121: amount
-    amountToString(amount, sizeof(amount), readUint64BE(dataBuffer + 114));
+    // 114-121:
+    _tx.amount = read_uint64_be(dataBuffer + 114);
+    amount_to_string(_ui.amount, sizeof(_ui.amount), _tx.amount);
+
+    // TODO token_id
+    _tx.token_id = 1; // TODO
 
     // 122-129: fee
-    amountToString(fee, sizeof(fee), readUint64BE(dataBuffer + 122));
+    _tx.fee = read_uint64_be(dataBuffer + 122);
+    amount_to_string(_ui.fee, sizeof(_ui.fee), _tx.fee);
 
-    // 130-137: nonce
-    valueToString(nonce, sizeof(nonce), readUint64BE(dataBuffer + 130));
+    // TODO fee_token
+    _tx.fee_token = 1;
 
-    // 138-495: random_oracle_input
-    memcpy(random_oracle_input, dataBuffer + 138, sizeof(random_oracle_input));
+    // 130-137: nonce // TODO: change to 32bits
+    _tx.nonce = (uint32_t)read_uint64_be(dataBuffer + 130);
+    value_to_string(_ui.nonce, sizeof(_ui.nonce), (uint64_t)_tx.nonce);
+
+    // TODO
+    _tx.valid_until = 10000;
+    _tx.tag[0] = 0;
+    _tx.tag[1] = 0;
+    _tx.tag[2] = 0;
+    _tx.token_locked = false;
+    prepare_memo(_tx.memo, "this is a memo");
 
     ux_flow_init(0, ux_sign_payment_tx_flow, NULL);
     *flags |= IO_ASYNCH_REPLY;

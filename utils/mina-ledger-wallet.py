@@ -25,6 +25,7 @@ send_payment_parser.add_argument('receiver', help='Coda address of recipient')
 send_payment_parser.add_argument('amount', help='Payment amount you want to send')
 send_payment_parser.add_argument('--rosetta_server', help='Rosetta server (default http://localhost:3087)')
 send_payment_parser.add_argument('--fee', help='Max fee')
+send_payment_parser.add_argument('--nonce', help='Nonce override')
 
 args = parser.parse_args()
 
@@ -56,10 +57,12 @@ try:
                 if "metadata" not in resp:
                         print("Failed to get metadata")
                         raise Exception("Unable to connect to Mina rosetta port ({})".format(args.rosetta_server))
-                nonce = resp["metadata"]["nonce"];
+                nonce = int(resp["metadata"]["nonce"]);
                 fee = float(resp["suggested_fee"][0]["value"])/COIN
                 if args.fee is not None:
                     fee = float(args.fee)
+                if args.nonce is not None:
+                    nonce = int(args.nonce)
 
                 amount = float(args.amount)
 
@@ -114,8 +117,10 @@ try:
                 receiver = payment["to"].encode().hex()
                 amount = '{:016x}'.format(int(payment["amount"]))
                 fee = '{:016x}'.format(int(payment["fee"]))
-                nonce = '{:016x}'.format(int(payment["nonce"]))
+                nonce = '{:016x}'.format(nonce)
                 random_oracle_input = unsigned_tx["randomOracleInput"]
+
+                print("ROI = {}".format(random_oracle_input.lower()))
 
                 total_len = len(sender_bip44_account) \
                             + len(sender_address) \

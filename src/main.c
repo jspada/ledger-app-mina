@@ -43,7 +43,7 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                 THROW(0x6E00);
             }
 
-            uint32_t dataLength = readUint32BE(G_io_apdu_buffer + OFFSET_LC);
+            uint32_t dataLength = read_uint32_be(G_io_apdu_buffer + OFFSET_LC);
             switch (G_io_apdu_buffer[OFFSET_INS]) {
 
                 case INS_GET_APP_CONFIGURATION:

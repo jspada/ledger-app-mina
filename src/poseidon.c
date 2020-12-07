@@ -1,17 +1,19 @@
-/*******************************************************************************
- * Poseidon is used to hash to a field in the schnorr signature scheme we use.
- * In order to be efficiently computed within the snark, it is computed using
- * the base field of the elliptic curve, and the result is then used as a
- * scalar field element, to scale the elliptic curve point. We do all of the
- * computation in this file in the base field, but output the result as a scalar.
- ********************************************************************************/
+// Poseidon hash function
+//     Details: https://eprint.iacr.org/2019/458.pdf
+//
+//     Poseidon is used to hash to a field in the schnorr signature scheme we
+//     use. In order to be efficiently computed within the snark, it is computed
+//     using the base field of the elliptic curve, and the result is then used
+//     as a scalar field element, to scale the elliptic curve point. We do all
+//     of the computation in this file in the base field, but output the result
+//     as a scalar.
+
 #include <os.h>
 
 #include "crypto.h"
 #include "poseidon.h"
 
-// There are commented out round keys to mirror the OCaml implementation.
-// These could be used if the number of rounds is extended in the future.
+// Round constants Pasta Fp (first 64)
 static const Field round_keys[ROUNDS][SPONGE_SIZE] = {
     {
         {
@@ -261,10 +263,10 @@ static const Field round_keys[ROUNDS][SPONGE_SIZE] = {
             0x8b, 0x63, 0xc4, 0x5e, 0x6c, 0x1e, 0xc9, 0xca
         },
         {
-            0x65, 0x26, 0x48, 0xb3, 0x54, 0x88, 0x00, 0xe4,
-            0xc4, 0xe9, 0xa5, 0xbe, 0x98, 0xe2, 0x02, 0x71,
-            0x30, 0xf8, 0x3c, 0x2b, 0x57, 0xe3, 0xf1, 0xee,
-            0xa2, 0xee, 0x04, 0x29, 0x45, 0x30, 0x90
+            0x00, 0x65, 0x26, 0x48, 0xb3, 0x54, 0x88, 0x00,
+            0xe4, 0xc4, 0xe9, 0xa5, 0xbe, 0x98, 0xe2, 0x02,
+            0x71, 0x30, 0xf8, 0x3c, 0x2b, 0x57, 0xe3, 0xf1,
+            0xee, 0xa2, 0xee, 0x04, 0x29, 0x45, 0x30, 0x90
         },
         {
             0x12, 0x87, 0x7b, 0x53, 0x82, 0x24, 0xe2, 0x35,
@@ -1095,10 +1097,10 @@ static const Field round_keys[ROUNDS][SPONGE_SIZE] = {
     },
     {
         {
-            0xfd, 0xdd, 0x23, 0x4b, 0x11, 0xd1, 0xb7, 0x7f,
-            0xf3, 0x59, 0x5b, 0x74, 0xc9, 0x4a, 0x57, 0xa9,
-            0xb7, 0xca, 0x46, 0x05, 0xc6, 0x26, 0xa4, 0xe7,
-            0x0a, 0xa1, 0xde, 0x72, 0x1e, 0xdb, 0xc2
+            0x00, 0xfd, 0xdd, 0x23, 0x4b, 0x11, 0xd1, 0xb7,
+            0x7f, 0xf3, 0x59, 0x5b, 0x74, 0xc9, 0x4a, 0x57,
+            0xa9, 0xb7, 0xca, 0x46, 0x05, 0xc6, 0x26, 0xa4,
+            0xe7, 0x0a, 0xa1, 0xde, 0x72, 0x1e, 0xdb, 0xc2
         },
         {
             0x33, 0xf1, 0x3c, 0xba, 0xa0, 0xe9, 0x19, 0x6a,
@@ -1221,10 +1223,10 @@ static const Field round_keys[ROUNDS][SPONGE_SIZE] = {
             0xd5, 0xcd, 0x3a, 0xe4, 0x8b, 0x2b, 0x19, 0xb9
         },
         {
-            0x39, 0xe7, 0xc1, 0x87, 0xe0, 0xb6, 0x4f, 0x15,
-            0x75, 0x7e, 0x5a, 0xc9, 0x0b, 0xf4, 0x72, 0x9d,
-            0x6a, 0xd6, 0x62, 0x8e, 0xa7, 0xb4, 0xa8, 0x64,
-            0x49, 0x92, 0xe8, 0x64, 0x0a, 0xf6, 0x7d
+            0x00, 0x39, 0xe7, 0xc1, 0x87, 0xe0, 0xb6, 0x4f,
+            0x15, 0x75, 0x7e, 0x5a, 0xc9, 0x0b, 0xf4, 0x72,
+            0x9d, 0x6a, 0xd6, 0x62, 0x8e, 0xa7, 0xb4, 0xa8,
+            0x64, 0x49, 0x92, 0xe8, 0x64, 0x0a, 0xf6, 0x7d
         },
         {
             0x32, 0x81, 0x44, 0xc1, 0x2f, 0xff, 0xac, 0xab,
@@ -1295,7 +1297,7 @@ static const Field round_keys[ROUNDS][SPONGE_SIZE] = {
     }
 };
 
-// MDS matrix
+// MDS matrix Pasta Fp
 static const Field mds_matrix[SPONGE_SIZE][SPONGE_SIZE] = {
     {
         {
@@ -1359,48 +1361,62 @@ static const Field mds_matrix[SPONGE_SIZE][SPONGE_SIZE] = {
     }
 };
 
+// Used by sbox(), α = 5
+static const Field FIELD_FIVE = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05
+};
+
 void matrix_mul(State s1, const State m[SPONGE_SIZE])
 {
-    State s2 = { { 0 }, { 0 }, { 0 } };
+    State s2;
+    os_memset(s2, 0, sizeof(s2));
+
     for (size_t row = 0; row < SPONGE_SIZE; row++) {
         // Inner product
         for (size_t col = 0; col < SPONGE_SIZE; col++) {
             Field t0;
             field_mul(t0, s1[col], m[row][col]);
-            field_add(s2[row], s2[row], t0);
+
+            Field t1;
+            field_copy(t1, s2[row]);
+            field_add(s2[row], t1, t0);
         }
     }
 
     for (size_t col = 0; col < SPONGE_SIZE; col++) {
-        os_memcpy(s1[col], s2[col], sizeof(s1[col]));
+        field_copy(s1[col], s2[col]);
     }
 }
 
-// Alpha is only one byte long, so this only needs len_e = 1
-void to_the_alpha(Field xa, const Field x)
+// α-power SBOX
+void sbox(Field xa, const Field x) // 09179b
 {
-    static const unsigned char alpha = 0x05;
-    field_pow(xa, x, &alpha);
+    field_pow(xa, x, FIELD_FIVE);
 }
 
-// https://eprint.iacr.org/2019/458 (figure on page 8)
+// https://eprint.iacr.org/2019/458.pdf (figure on page 8)
 // The implementation here just runs the internal poseidon function to update
 // the state. It takes state as input and mutates this to return the altered
-// state as output. Adding new inputs to the state is done separately, and
-// so the functions poseidon_1in and poseidon_2in handle both the addition
-// of inputs and running of the poseidon function.
+// state as output.
 void poseidon_permutation(State s)
 {
+    Field tmp;
+
     // Full rounds
     for (size_t r = 0; r < FULL_ROUNDS; r++) {
         // ark
-        for (unsigned int i = 0; i < SPONGE_SIZE; i++) {
-            field_add(s[i], s[i], round_keys[r][i]);
+        for (size_t i = 0; i < SPONGE_SIZE; i++) {
+            field_copy(tmp, s[i]);
+            field_add(s[i], tmp, round_keys[r][i]);
         }
 
         // sbox
-        for (unsigned int i = 0; i < SPONGE_SIZE; i++) {
-            to_the_alpha(s[i], s[i]);
+        for (size_t i = 0; i < SPONGE_SIZE; i++) {
+            field_copy(tmp, s[i]);
+            sbox(s[i], tmp);
         }
 
         // mds
@@ -1408,25 +1424,36 @@ void poseidon_permutation(State s)
     }
 
     // Final ark
-    for (unsigned int i = 0; i < SPONGE_SIZE; i++) {
-        field_add(s[i], s[i], round_keys[ROUNDS - 1][i]);
+    for (size_t i = 0; i < SPONGE_SIZE; i++) {
+        field_copy(tmp, s[i]);
+        field_add(s[i], tmp, round_keys[ROUNDS - 1][i]);
     }
 }
 
-// Convenience function for when you want to run poseidon with two elements as
-// input.
-void add_chunk(State s, const Scalar input0, const Scalar input1)
+void poseidon_update(State s, const Field *input, size_t len)
 {
-    field_add(s[0], s[0], input0);
-    field_add(s[1], s[1], input1);
-    poseidon_permutation(s);
-}
+    Field tmp;
+    size_t pairs = len / 2;
 
-void poseidon_update(State s, const Scalar *input, size_t len)
-{
+    for (size_t i = 0; i < pairs; ++i) {
+        field_copy(tmp, s[0]);
+        field_add(s[0], tmp, input[2*i]);
+
+        field_copy(tmp, s[1]);
+        field_add(s[1], tmp, input[2*i + 1]);
+
+        poseidon_permutation(s);
+    }
+
+    if (2 * pairs < len) {
+        field_copy(tmp, s[0]);
+        field_add(s[0], tmp, input[2 * pairs]);
+
+        poseidon_permutation(s);
+    }
 }
 
 // Squeezing poseidon returns the first element of its current state.
 void poseidon_digest(Scalar out, const State s) {
-    os_memcpy(out, s[0], sizeof(s[0]));
+    field_copy(out, s[0]);
 }

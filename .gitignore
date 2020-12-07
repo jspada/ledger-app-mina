@@ -8,4 +8,4 @@ src/glyphs.h
 *.o
 *~
 tests/utils_tests
-
+tests/random_oracle_input_tests

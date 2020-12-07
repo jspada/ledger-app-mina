@@ -33,7 +33,7 @@ print("Running unit tests")
 def run_get_address_tests():
 
     # account 0
-    # private key 3c041039ac9ac5dea94330115aacf6d4780f08d7299a84a6ee2b62599cebb5e6
+    # private key 3c041039ac9ac5dea94330115aacf6d4780f08d7299a84a6ee2b62599cebb5e6 (27145950286090989573235160126994188021722699404890955797699008383743072908774)
     # public key 1e32fca120ee917a3ce10d2198300526c5289f276b2020d77329d38538be2be93011e21673a9e1af4240ecac174770f2db76c646cd5609196421ffaefed46d94
     assert(get_address(0) == "B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx")
 

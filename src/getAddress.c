@@ -23,9 +23,9 @@ static void gen_address()
         BEGIN_TRY {
             Keypair kp;
             TRY {
-                generate_keypair(account, &kp);
+                generate_keypair(&kp, account);
 
-                int result = get_address(&kp.pub, address, sizeof(address));
+                int result = get_address(address, sizeof(address), &kp.pub);
                 switch (result) {
                     case -2:
                         THROW(EXCEPTION_OVERFLOW);
@@ -118,7 +118,7 @@ void handleGetAddress(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t data
     UNUSED(p2);
 
     address[0] = '\0';
-    account = readUint32BE(dataBuffer);
+    account = read_uint32_be(dataBuffer);
 
     ux_flow_init(0, ux_processing_flow, NULL);
     *flags |= IO_ASYNCH_REPLY;

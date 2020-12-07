@@ -26,8 +26,9 @@
 #include "poseidon.h"
 #include "utils.h"
 #include "globals.h"
+#include "random_oracle_input.h"
 
-// scalar field Fp
+// base field Fp
 static const Field FIELD_MODULUS = {
     0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -35,7 +36,7 @@ static const Field FIELD_MODULUS = {
     0x99, 0x2d, 0x30, 0xed, 0x00, 0x00, 0x00, 0x01
 };
 
-// base field Fq
+// scalar field Fq
 static const Scalar GROUP_ORDER = {
     0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -79,8 +80,19 @@ static const Field FIELD_EIGHT = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08
 };
 
-static const Field FIELD_ZERO = { 0 };
-static const Scalar SCALAR_ZERO = { 0 };
+static const Field FIELD_ZERO = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+static const Scalar SCALAR_ZERO = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
 
 // (X : Y : Z) = (0 : 1 : 0)
 static const Group GROUP_ZERO = {
@@ -120,6 +132,13 @@ static const Affine AFFINE_ONE = {
     }
 };
 
+void field_copy(Field a, const Field b)
+{
+    for (size_t i = 0; i < sizeof(Field); i++) {
+        a[i] = b[i];
+    }
+}
+
 void field_add(Field c, const Field a, const Field b)
 {
     cx_math_addm(c, a, b, FIELD_MODULUS, FIELD_BYTES);
@@ -147,13 +166,18 @@ void field_inv(Field c, const Field a)
 
 void field_negate(Field c, const Field a)
 {
-    cx_math_subm(c, FIELD_MODULUS, a, FIELD_MODULUS, FIELD_BYTES);
+    // Ledger API expects inputs to be in range [0, FIELD_MODULUS)
+    cx_math_subm(c, FIELD_ZERO, a, FIELD_MODULUS, FIELD_BYTES);
 }
 
 // c = a^e mod m
-// cx_math_powm(result_pointer, a, e, len_e, m, len(result)  (which is also
-// len(a) and len(m)) )
 void field_pow(Field c, const Field a, const Field e)
+{
+    cx_math_powm(c, a, e, FIELD_BYTES, FIELD_MODULUS, FIELD_BYTES);
+}
+
+// c = a^e mod m
+void field_pow_orig(Field c, const Field a, const Field e)
 {
     cx_math_powm(c, a, e, 1, FIELD_MODULUS, FIELD_BYTES);
 }
@@ -161,6 +185,13 @@ void field_pow(Field c, const Field a, const Field e)
 unsigned int field_eq(const Field a, const Field b)
 {
     return (os_memcmp(a, b, FIELD_BYTES) == 0);
+}
+
+void scalar_copy(Scalar a, const Scalar b)
+{
+    for (size_t i = 0; i < sizeof(Scalar); i++) {
+        a[i] = b[i];
+    }
 }
 
 void scalar_add(Scalar c, const Scalar a, const Scalar b)
@@ -183,12 +214,16 @@ void scalar_sq(Scalar c, const Scalar a)
     cx_math_multm(c, a, a, GROUP_ORDER, SCALAR_BYTES);
 }
 
+void scalar_negate(Field c, const Field a)
+{
+    // Ledger API expects inputs to be in range [0, GROUP_ORDER)
+    cx_math_subm(c, SCALAR_ZERO, a, GROUP_ORDER, SCALAR_BYTES);
+}
+
 // c = a^e mod m
-// cx_math_powm(result_pointer, a, e, len_e, m, len(result)  (which is also
-// len(a) and len(m)) )
 void scalar_pow(Scalar c, const Scalar a, const Scalar e)
 {
-    cx_math_powm(c, a, e, 1, GROUP_ORDER, SCALAR_BYTES);
+    cx_math_powm(c, a, e, SCALAR_BYTES, GROUP_ORDER, SCALAR_BYTES);
 }
 
 unsigned int scalar_eq(const Scalar a, const Scalar b)
@@ -466,7 +501,7 @@ inline unsigned int is_odd(const Field y)
 //   function)
 // - BIP44 for HD account derivation (so e.g. btc and mina keys don't
 //   clash)
-void generate_keypair(uint32_t account, Keypair *keypair)
+void generate_keypair(Keypair *keypair, uint32_t account)
 {
     if (!keypair) {
         THROW(INVALID_PARAMETER);
@@ -487,7 +522,7 @@ void generate_keypair(uint32_t account, Keypair *keypair)
     // Note: Mina does rejection sampling to obtain a private key in
     // [0, p), where the field modulus
     //
-    //     p = 28948022309329048855892746252171976963322203655954433126947083963168578338817
+    //     p = 28948022309329048855892746252171976963363056481941560715954676764349967630337
     //
     // Due to constraints, this implementation take a different
     // approach and just unsets the top two bits of the 256bit bip44
@@ -498,7 +533,7 @@ void generate_keypair(uint32_t account, Keypair *keypair)
     // If p < max then we could still generate invalid private keys
     // (although it's highly unlikely), but
     //
-    //     p - max = 4707489544292117082687961190295928834
+    //     p - max = 45560315531419706090280762371685220354
     //
     // Thus, we cannot generate invalid private keys and instead lose an
     // insignificant amount of entropy.
@@ -510,7 +545,7 @@ void generate_keypair(uint32_t account, Keypair *keypair)
     return;
 }
 
-int get_address(const Affine *pub_key, char *address, size_t len)
+int get_address(char *address, size_t len, const Affine *pub_key)
 {
     if (len != MINA_ADDRESS_LEN) {
         THROW(INVALID_PARAMETER);
@@ -540,7 +575,7 @@ int get_address(const Affine *pub_key, char *address, size_t len)
     os_memmove(raw.checksum, hash2, 4);
 
     // Encode as address
-    int result = encodeBase58((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
+    int result = b58_encode((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
     if (result < 0) {
         address[0] = '\0';
     }
@@ -556,17 +591,32 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key)
     affine_scalar_mul(pub_key, priv_key, &AFFINE_ONE);
 }
 
-void blake2b_hash(uint8_t *input, size_t len, uint8_t output[32])
+void message_derive(Scalar out, const Keypair *kp, const ROInput *input)
 {
-    cx_blake2b_t blake_ctx;
-    cx_blake2b_init(&blake_ctx, 256);
-    cx_hash(&blake_ctx.header, 0, input, len, NULL, 0);
-    cx_hash(&blake_ctx.header, CX_LAST, NULL, 0, output, blake_ctx.ctx.outlen);
+    uint8_t derive_msg[267] = { };
+    size_t derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input);
+
+    // blake2b hash
+    cx_blake2b_t ctx;
+    cx_blake2b_init(&ctx, 256);
+    cx_hash(&ctx.header, 0, derive_msg, derive_len, NULL, 0);
+    Scalar bytes;
+    cx_hash(&ctx.header, CX_LAST, NULL, 0, bytes, ctx.ctx.outlen);
+
+    // Convert to scalar
+    for (size_t i = sizeof(Scalar); i > 0; i--) {
+        out[i - 1] = bytes[sizeof(Scalar) - i]; // Reverse bytes
+    }
+    // Unset top two bits
+    out[0] &= 0x3f;
 }
 
-void schnorr_hash(Scalar out, const Scalar in0, const Scalar in1,
-                  const Scalar in2, const Scalar in3, const Scalar in4)
+void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input)
 {
+    Field hash_msg[9];
+    size_t hash_msg_len = roinput_hash_message(hash_msg, sizeof(hash_msg),
+                                               pub, rx, input);
+
     // Initial sponge state
     State pos = {
         {
@@ -589,30 +639,34 @@ void schnorr_hash(Scalar out, const Scalar in0, const Scalar in1,
         }
     };
 
-    // poseidon_2in(pos, in0, in1);
-    // poseidon_2in(pos, in2, in3);
-    // poseidon_1in(pos, in4);
+    poseidon_update(pos, hash_msg, hash_msg_len);
     poseidon_digest(out, pos);
 }
 
-void sign(const Keypair *kp, const Scalar msgx, const Scalar msgm, Signature *sig)
+void sign(Signature *sig, const Keypair *kp, const ROInput *input)
 {
-    Scalar k_prime;
-    /* rx is G_io_apdu_buffer so we can take 192 bytes from it */
-    {
-        Affine *r;
-        r = (Affine *)sig->rx;
-        schnorr_hash(k_prime, msgx, msgm, kp->pub.x, kp->pub.y, kp->priv); // k = hash(m || pkx || pky || sk)
-        affine_scalar_mul(r, k_prime, &AFFINE_ONE);                        // r = k*g
+    // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
+    Scalar k = { };
+    message_derive(k, kp, input);
 
-        if (is_odd(r->y)) {
-            scalar_sub(k_prime, GROUP_ORDER, k_prime); // if ry is odd, k = - k'
-        }
-        /* store so we don't need affine *r anymore */
-        os_memcpy(sig->rx, r->x, FIELD_BYTES);
+    // r = k*g
+    Affine r;
+    affine_scalar_mul(&r, k, &AFFINE_ONE);
+    field_copy(sig->rx, r.x);
+
+    if (is_odd(r.y)) {
+        // k = -k
+        Scalar tmp;
+        scalar_copy(tmp, k);
+        scalar_negate(k, tmp);
     }
-    schnorr_hash(sig->s, msgx, kp->pub.x, kp->pub.y, sig->rx, msgm); // e = hash(x || pkx || pky || xr || m)
-    os_memcpy(sig->s, SCALAR_ZERO, SCALAR_BYTES - 16);               // use 128 LSB (128/8 = 16) as challenge
-    scalar_mul(sig->s, sig->s, kp->priv);                            // e*sk
-    scalar_add(sig->s, k_prime, sig->s);                             // k + e*sk
+
+    // e = message_hash(input + kp.pub + r.x)
+    Scalar e;
+    message_hash(e, &kp->pub, r.x, input);
+
+    // s = k + e*sk
+    Scalar e_priv;
+    scalar_mul(e_priv, e, kp->priv);
+    scalar_add(sig->s, k, e_priv);
 }
