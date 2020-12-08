@@ -30,7 +30,7 @@ send_payment_parser.add_argument('--nonce', help='Nonce override')
 args = parser.parse_args()
 
 try:
-        dongle = ledgerblue.getDongle(True)
+        dongle = ledgerblue.getDongle(debug=False)
 
         if args.operation == 'get-address':
                 # Create APDU message.
@@ -41,9 +41,18 @@ try:
                 account = '{:08x}'.format(int(args.account_number))
                 apduMessage = 'E0020000' + '{:08x}'.format(len(account) + 4) + account
                 apdu = bytearray.fromhex(apduMessage)
-                print("Getting address...")
+                print("Get address for account {} (BIP44 path m/44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(args.account_number, args.account_number))
+
+                while True:
+                    answer = str(input("Continue? (y/N) ")).lower().strip()
+                    if answer == 'y':
+                        break
+                    else:
+                        sys.exit(211)
+
+                print("Generating address... (Please confirm on Ledger device)")
                 address = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
-                print('Received: {}'.format(address))
+                print('Received address: {}'.format(address))
 
         elif args.operation == "send-payment":
                 if args.rosetta_server is None:
@@ -80,7 +89,8 @@ try:
 
                 print()
                 print("Payment details:")
-                print("    Sender:   {}".format(construction_payloads_request["operations"][0]["account"]["address"]))
+                print("    Account:  {}".format(args.sender_bip44_account))
+                print("    Sender:   {} (m/44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(construction_payloads_request["operations"][0]["account"]["address"], args.sender_bip44_account))
                 print("    Amount:   {:.9f}".format(amount))
                 print("    Nonce:    {}".format(nonce))
                 print("    Fee:      {:.9f}".format(fee))
@@ -88,11 +98,11 @@ try:
                 print()
 
                 while True:
-                        answer = str(input("Continue? (y/N) ")).lower().strip()
-                        if answer == 'y':
-                                break
-                        else:
-                                sys.exit(211)
+                    answer = str(input("Continue? (y/N) ")).lower().strip()
+                    if answer == 'y':
+                        break
+                    else:
+                        sys.exit(211)
 
                 # print(json.dumps(construction_payloads_request))
                 resp = requests.post(args.rosetta_server + '/construction/payloads',
@@ -120,8 +130,6 @@ try:
                 nonce = '{:016x}'.format(nonce)
                 random_oracle_input = unsigned_tx["randomOracleInput"]
 
-                print("ROI = {}".format(random_oracle_input.lower()))
-
                 total_len = len(sender_bip44_account) \
                             + len(sender_address) \
                             + len(receiver) \
@@ -140,9 +148,9 @@ try:
                               + random_oracle_input
 
                 apdu = bytearray.fromhex(apduMessage)
-                print("Signing payment transaction...")
+                print("Signing transaction... (Please confirm on Ledger device)")
                 address = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
-                print('Received: {}'.format(address))
+                print('Received signature: {}'.format(address))
 
                 print("Sending payment...")
 

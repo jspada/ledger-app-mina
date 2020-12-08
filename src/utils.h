@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "crypto.h"
+#include "random_oracle_input.h"
 
 #define ARRAY_LEN(array) sizeof(array)/sizeof(array[0])
 
@@ -13,7 +14,6 @@ uint64_t read_uint64_be(uint8_t *buffer);
 
 char *amount_to_string(char *buf, size_t len, uint64_t amount);
 char *value_to_string(char *buf, size_t len, uint64_t value);
-void prepare_memo(uint8_t *out, const char *s);
 
 int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
                unsigned char maxoutlen);

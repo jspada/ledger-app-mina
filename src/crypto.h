@@ -7,33 +7,15 @@
 #define BIP32_PATH_LEN 5
 #define BIP32_HARDENED_OFFSET 0x80000000
 
-#define FIELD_BYTES   32
-#define FIELD_SIZE_IN_BITS 255
-#define SCALAR_BYTES  32
-#define SCALAR_BITS   256
-#define SCALAR_OFFSET 2     // Scalars have 254 used bits
+#define FIELD_BYTES    32
+#define SCALAR_BYTES   32
+#define SCALAR_BITS    256
+#define SCALAR_OFFSET  2   // Scalars have 254 used bits
 
+#define SIGNATURE_LEN    64
 #define MINA_ADDRESS_LEN 56 // includes null-byte
 
 #define COIN 1000000000ULL
-
-typedef uint64_t Currency;
-#define FEE_BITS 64
-#define AMOUNT_BITS 64
-typedef uint32_t GlobalSlot;
-#define GLOBAL_SLOT_BITS 32
-typedef uint32_t Nonce;
-#define NONCE_BITS 32
-typedef uint64_t TokenId;
-#define TOKEN_ID_BITS 64
-#define MEMO_BYTES 34
-typedef uint8_t Memo[MEMO_BYTES];
-#define MEMO_BITS (MEMO_BYTES * 8)
-typedef bool Tag[3];
-#define TAG_BITS 3
-#define TX_BITS_LEN ((FEE_BITS + TOKEN_ID_BITS + 1 + NONCE_BITS + \
-                      GLOBAL_SLOT_BITS + MEMO_BITS + TAG_BITS + 1 + 1 + \
-                      TOKEN_ID_BITS + AMOUNT_BITS + 1 + 7)/8)
 
 typedef uint8_t Field[FIELD_BYTES];
 typedef uint8_t Scalar[SCALAR_BYTES];
@@ -53,23 +35,6 @@ typedef struct compressed {
     Field x;
     bool is_odd;
 } Compressed;
-
-typedef struct transaction {
-    // common
-    Currency fee;
-    TokenId fee_token;
-    Compressed fee_payer_pk;
-    Nonce nonce;
-    GlobalSlot valid_until;
-    Memo memo;
-    // body
-    Tag tag;
-    Compressed source_pk;
-    Compressed receiver_pk;
-    TokenId token_id;
-    Currency amount;
-    bool token_locked;
-} Transaction;
 
 typedef struct signature {
     Field rx;

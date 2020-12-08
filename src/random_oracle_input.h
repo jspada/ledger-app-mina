@@ -3,6 +3,8 @@
 #include "crypto.h"
 #include "utils.h"
 
+#define FIELD_BITS 255
+
 struct roinput {
     Field   *fields;
     uint8_t *bits;
@@ -25,6 +27,5 @@ void roinput_add_bit(ROInput *input, bool b);
 void roinput_add_bytes(ROInput *input, const uint8_t *bytes, size_t len);
 void roinput_add_uint32(ROInput *input, const uint32_t x);
 void roinput_add_uint64(ROInput *input, const uint64_t x);
-void roinput_from_transaction(ROInput *input, const Transaction *tx);
 size_t roinput_derive_message(uint8_t *out, size_t len, const Keypair *kp, const ROInput *msg);
 size_t roinput_hash_message(Field *out, size_t len, const Affine *pub, const Field rx, const ROInput *msg);

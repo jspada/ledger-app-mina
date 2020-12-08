@@ -47,6 +47,7 @@ all: default unit_tests
 # Platform #
 ############
 
+DEFINES   += LEDGER_BUILD
 DEFINES   += OS_IO_SEPROXYHAL
 DEFINES   += HAVE_BAGL HAVE_SPRINTF
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
@@ -159,8 +160,6 @@ include $(BOLOS_SDK)/Makefile.rules
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
-
-
 
 listvariants:
 	@echo VARIANTS COIN mina

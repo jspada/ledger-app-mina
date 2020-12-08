@@ -16,8 +16,8 @@
 ********************************************************************************/
 
 #include "utils.h"
-#include "getAddress.h"
-#include "signPaymentTx.h"
+#include "get_address.h"
+#include "sign_tx.h"
 #include "menu.h"
 
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
@@ -55,11 +55,17 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                     break;
 
                 case INS_GET_ADDR:
-                    handleGetAddress(G_io_apdu_buffer[OFFSET_P1], G_io_apdu_buffer[OFFSET_P2], G_io_apdu_buffer + OFFSET_CDATA, dataLength, flags, tx);
+                    handle_get_address(G_io_apdu_buffer[OFFSET_P1],
+                                       G_io_apdu_buffer[OFFSET_P2],
+                                       G_io_apdu_buffer + OFFSET_CDATA,
+                                       dataLength, flags, tx);
                     break;
 
             case INS_SIGN_PAYMENT_TX:
-                    handleSignPaymentTx(G_io_apdu_buffer[OFFSET_P1], G_io_apdu_buffer[OFFSET_P2], G_io_apdu_buffer + OFFSET_CDATA, dataLength, flags, tx);
+                    handle_sign_tx(G_io_apdu_buffer[OFFSET_P1],
+                                   G_io_apdu_buffer[OFFSET_P2],
+                                   G_io_apdu_buffer + OFFSET_CDATA,
+                                   dataLength, flags, tx);
                     break;
 
                 default:

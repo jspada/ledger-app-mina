@@ -1,10 +1,11 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "signPaymentTx.h"
+#include "sign_tx.h"
 #include "utils.h"
 #include "crypto.h"
 #include "random_oracle_input.h"
+#include "transaction.h"
 
 // Account variables
 static uint32_t _account = 0;
@@ -14,10 +15,10 @@ static char     _address[MINA_ADDRESS_LEN];
 // Transaction related
 static Transaction _tx;
 static Field       _input_fields[3];
-static uint8_t     _input_bits[TX_BITS_LEN];
+static uint8_t     _input_bits[TX_BITSTRINGS_BYTES];
 static ROInput     _roinput;
 static Signature   _sig;
-static char        _signature[65];
+static char        _signature[2*SIGNATURE_LEN + 1];
 
 // UI variables
 static struct ui_t {
@@ -38,48 +39,47 @@ static uint8_t set_result_get_signature()
 
 static void sign_transaction()
 {
-    if (_signature[0] == '\0')
-    {
-        BEGIN_TRY {
-            TRY {
+    BEGIN_TRY {
+        TRY {
+            // Get the account's private key and validate corresponding
+            // public key matches the sender address
+            generate_keypair(&_kp, _account);
+            int result = get_address(_address, sizeof(_address), &_kp.pub);
+            switch (result) {
+                case -2:
+                THROW(EXCEPTION_OVERFLOW);
 
-                // Get the private key and validate corresponding public key
-                // matches the sender
-                generate_keypair(&_kp, _account);
-                int result = get_address(_address, sizeof(_address), &_kp.pub);
-                switch (result) {
-                    case -2:
-                        THROW(EXCEPTION_OVERFLOW);
+                case -1:
+                THROW(INVALID_PARAMETER);
 
-                    case -1:
-                        THROW(INVALID_PARAMETER);
-
-                    default:
-                        ; // SUCCESS
-                }
-                if (strncmp(_address, _ui.sender, sizeof(_address)) != 0) {
-                    THROW(INVALID_PARAMETER);
-                }
-
-                // Create random oracle input from transaction
-                _roinput.fields = _input_fields;
-                _roinput.fields_capacity = ARRAY_LEN(_input_fields);
-                _roinput.bits = _input_bits;
-                _roinput.bits_capacity = ARRAY_LEN(_input_bits);
-                roinput_from_transaction(&_roinput, &_tx);
-
-                sign(&_sig, &_kp, &_roinput);
-                for (size_t i = 0; i < sizeof(_sig.s); i++) {
-                    snprintf(&_signature[i*2], 3, "%02x", _sig.s[i]);
-                }
-                _signature[64] = '\0';
-
+                default:
+                ; // SUCCESS
             }
-            FINALLY {
-                os_memset((void *)_kp.priv, 0, sizeof(_kp.priv));
+            if (strncmp(_address, _ui.sender, sizeof(_address)) != 0) {
+                THROW(INVALID_PARAMETER);
             }
-            END_TRY;
+
+            // Create random oracle input from transaction
+            _roinput.fields = _input_fields;
+            _roinput.fields_capacity = ARRAY_LEN(_input_fields);
+            _roinput.bits = _input_bits;
+            _roinput.bits_capacity = ARRAY_LEN(_input_bits);
+            transaction_to_roinput(&_roinput, &_tx);
+
+            sign(&_sig, &_kp, &_roinput);
+
+            uint8_t *p = (uint8_t *)&_sig;
+            for (size_t i = 0; i < sizeof(_sig); i++) {
+                snprintf(&_signature[i*2], 3, "%02x", p[i]);
+            }
+            _signature[sizeof(Signature)*2] = '\0';
+
         }
+        FINALLY {
+            // Clear private key from memory
+            os_memset((void *)_kp.priv, 0, sizeof(_kp.priv));
+        }
+        END_TRY;
     }
 
     sendResponse(set_result_get_signature(), true);
@@ -172,7 +172,9 @@ UX_FLOW(ux_sign_payment_tx_flow,
         &ux_sign_payment_tx_flow_7_step
     );
 
-void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t dataLength, volatile unsigned int *flags, volatile unsigned int *unused)
+void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
+                    uint32_t dataLength, volatile unsigned int *flags,
+                    volatile unsigned int *unused)
 {
     UNUSED(dataLength);
     UNUSED(p2);
@@ -224,7 +226,7 @@ void handleSignPaymentTx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t d
     _tx.tag[1] = 0;
     _tx.tag[2] = 0;
     _tx.token_locked = false;
-    prepare_memo(_tx.memo, "this is a memo");
+    transaction_prepare_memo(_tx.memo, "this is a memo");
 
     ux_flow_init(0, ux_sign_payment_tx_flow, NULL);
     *flags |= IO_ASYNCH_REPLY;

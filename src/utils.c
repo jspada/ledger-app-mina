@@ -235,19 +235,6 @@ char *value_to_string(char *buf, size_t len, uint64_t value)
     return buf;
 }
 
-void prepare_memo(uint8_t *out, const char *s)
-{
-    size_t len = strnlen(s, MEMO_BYTES - 2);
-    out[0] = 1;
-    out[1] = len; // length
-    for (size_t i = 0; i < len; ++i) {
-        out[2 + i] = s[i];
-    }
-    for (size_t i = 2 + len; i < MEMO_BYTES; ++i) {
-        out[i] = 0;
-    }
-}
-
 void packed_bit_array_set(uint8_t *bits, size_t i, bool b)
 {
     size_t byte_idx = i / 8;

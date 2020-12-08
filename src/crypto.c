@@ -9,10 +9,8 @@
 //         - field_add, field_sub, field_mul, field_sq, field_inv, field_negate, field_pow, field_eq
 //         - scalar_add, scalar_sub, scalar_mul, scalar_sq, scalar_pow, scalar_eq
 //         - group_add, group_dbl, group_scalar_mul (group elements use projective coordinates)
-//         - affine_scalar_mul
-//         - projective_to_affine
-//         - generate_pubkey, generate_keypair
-//         - sign
+//         - affine_scalar_mul, projective_to_affine
+//         - generate_pubkey, generate_keypair, sign
 //
 //     * Curve details
 //         Pasta.Pallas (https://github.com/zcash/pasta)
@@ -174,12 +172,6 @@ void field_negate(Field c, const Field a)
 void field_pow(Field c, const Field a, const Field e)
 {
     cx_math_powm(c, a, e, FIELD_BYTES, FIELD_MODULUS, FIELD_BYTES);
-}
-
-// c = a^e mod m
-void field_pow_orig(Field c, const Field a, const Field e)
-{
-    cx_math_powm(c, a, e, 1, FIELD_MODULUS, FIELD_BYTES);
 }
 
 unsigned int field_eq(const Field a, const Field b)
@@ -669,4 +661,8 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input)
     Scalar e_priv;
     scalar_mul(e_priv, e, kp->priv);
     scalar_add(sig->s, k, e_priv);
+
+    // Clear secrets from memory
+    os_memset(&k, 0, sizeof(k));
+    os_memset(&e_priv, 0, sizeof(e_priv));
 }

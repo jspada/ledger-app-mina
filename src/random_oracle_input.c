@@ -1,6 +1,12 @@
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
+
+#ifdef LEDGER_BUILD
+    #include <os.h>
+#else
+    #define os_memset memset
+    #define os_memcpy memcpy
+#endif
 
 #include "random_oracle_input.h"
 #include "utils.h"
@@ -38,7 +44,7 @@ void roinput_add_bit(ROInput *input, bool b)
 void roinput_add_scalar(ROInput *input, const Scalar a)
 {
     size_t remaining = (int)input->bits_capacity * 8 - (int)input->bits_len;
-    const size_t len = FIELD_SIZE_IN_BITS;
+    const size_t len = FIELD_BITS;
 
     if (remaining < len) {
         return;
@@ -108,7 +114,7 @@ void roinput_to_bytes(uint8_t *out, const ROInput *input)
     for (size_t i = 0; i < input->fields_len; ++i) {
         uint8_t *field_bits = (uint8_t *)input->fields[i];
 
-        for (size_t j = 0; j < FIELD_SIZE_IN_BITS; ++j) {
+        for (size_t j = 0; j < FIELD_BITS; ++j) {
             packed_bit_array_set(
                 out
                 , bit_idx
@@ -140,7 +146,7 @@ size_t roinput_to_fields(Field *out, size_t len, const ROInput *input)
     size_t bits_consumed = 0;
 
     // pack in the bits
-    const size_t MAX_CHUNK_SIZE = FIELD_SIZE_IN_BITS - 1;
+    const size_t MAX_CHUNK_SIZE = FIELD_BITS - 1;
     while (bits_consumed < input->bits_len) {
         Field tmp = { };
 
@@ -163,31 +169,6 @@ size_t roinput_to_fields(Field *out, size_t len, const ROInput *input)
     return output_len;
 }
 
-void roinput_from_transaction(ROInput *input, const Transaction *tx)
-{
-    input->fields_len = 0;
-    input->bits_len = 0;
-
-    roinput_add_field(input, tx->fee_payer_pk.x);
-    roinput_add_field(input, tx->source_pk.x);
-    roinput_add_field(input, tx->receiver_pk.x);
-
-    roinput_add_uint64(input, tx->fee);
-    roinput_add_uint64(input, tx->fee_token);
-    roinput_add_bit(input, tx->fee_payer_pk.is_odd);
-    roinput_add_uint32(input, tx->nonce);
-    roinput_add_uint32(input, tx->valid_until);
-    roinput_add_bytes(input, tx->memo, MEMO_BYTES);
-    for (size_t i = 0; i < 3; ++i) {
-        roinput_add_bit(input, tx->tag[i]);
-    }
-    roinput_add_bit(input, tx->source_pk.is_odd);
-    roinput_add_bit(input, tx->receiver_pk.is_odd);
-    roinput_add_uint64(input, tx->token_id);
-    roinput_add_uint64(input, tx->amount);
-    roinput_add_bit(input, tx->token_locked);
-}
-
 size_t roinput_derive_message(uint8_t *out, size_t len, const Keypair *kp, const ROInput *msg)
 {
     Field   input_fields[msg->fields_capacity + 2];
@@ -197,8 +178,8 @@ size_t roinput_derive_message(uint8_t *out, size_t len, const Keypair *kp, const
     assert(msg->fields_len <= input.fields_capacity);
     assert(msg->bits_len <= input.bits_capacity*8);
 
-    memcpy(input.fields, msg->fields, sizeof(Field) * msg->fields_len);
-    memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
+    os_memcpy(input.fields, msg->fields, sizeof(Field) * msg->fields_len);
+    os_memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
     input.fields_len = msg->fields_len;
     input.bits_len = msg->bits_len;
 
@@ -206,10 +187,14 @@ size_t roinput_derive_message(uint8_t *out, size_t len, const Keypair *kp, const
     roinput_add_field(&input, kp->pub.y);
     roinput_add_scalar(&input, kp->priv);
 
-    size_t input_size_in_bits = input.bits_len + FIELD_SIZE_IN_BITS * input.fields_len;
+    size_t input_size_in_bits = input.bits_len + FIELD_BITS * input.fields_len;
     size_t input_size_in_bytes = (input_size_in_bits + 7) / 8;
     assert(input_size_in_bytes <= len);
     roinput_to_bytes(out, &input);
+
+    // Clear privkey material copy
+    os_memset(&input_bits, 0, sizeof(input_bits));
+
     return input_size_in_bytes;
 }
 
@@ -222,8 +207,8 @@ size_t roinput_hash_message(Field *out, size_t len, const Affine *pub, const Fie
     assert(msg->fields_len <= input.fields_capacity);
     assert(msg->bits_len <= input.bits_capacity*8);
 
-    memcpy(input.fields, msg->fields, sizeof(Field) * msg->fields_len);
-    memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
+    os_memcpy(input.fields, msg->fields, sizeof(Field) * msg->fields_len);
+    os_memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
     input.fields_len = msg->fields_len;
     input.bits_len = msg->bits_len;
 

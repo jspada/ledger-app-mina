@@ -1,8 +1,9 @@
+#include <stdio.h>
 #include <assert.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "random_oracle_input.h"
+#include "transaction.h"
 #include "utils.h"
 
 int main()
@@ -23,16 +24,16 @@ int main()
         .amount = 42,
         .token_locked = false
     };
-    prepare_memo(tx.memo, actual_memo);
+    transaction_prepare_memo(tx.memo, actual_memo);
     read_public_key_compressed(&tx.fee_payer_pk, fee_payer_str);
     read_public_key_compressed(&tx.source_pk, source_str);
     read_public_key_compressed(&tx.receiver_pk, receiver_str);
 
     // Create random oracle input
     Field   input_fields[3];
-    uint8_t input_bits[TX_BITS_LEN];
+    uint8_t input_bits[TX_BITSTRINGS_BYTES];
     ROInput input = roinput_create(input_fields, input_bits);
-    roinput_from_transaction(&input, &tx);
+    transaction_to_roinput(&input, &tx);
 
     Keypair kp = {
         {

@@ -1,31 +1,31 @@
 #include <assert.h>
 
-#include "getAddress.h"
+#include "get_address.h"
 #include "utils.h"
 #include "crypto.h"
 
-static uint32_t account = 0;
-static char address[MINA_ADDRESS_LEN];
+static uint32_t _account = 0;
+static char     _address[MINA_ADDRESS_LEN];
 
 static uint8_t set_result_get_address()
 {
     uint8_t tx = 0;
-    assert(strlen(address) == MINA_ADDRESS_LEN - 1);
-    os_memmove(G_io_apdu_buffer + tx, address, MINA_ADDRESS_LEN);
+    assert(strlen(_address) == MINA_ADDRESS_LEN - 1);
+    os_memmove(G_io_apdu_buffer + tx, _address, MINA_ADDRESS_LEN);
     tx += MINA_ADDRESS_LEN;
     return tx;
 }
 
 static void gen_address()
 {
-    if (address[0] == '\0')
+    if (_address[0] == '\0')
     {
         BEGIN_TRY {
             Keypair kp;
             TRY {
-                generate_keypair(&kp, account);
+                generate_keypair(&kp, _account);
 
-                int result = get_address(address, sizeof(address), &kp.pub);
+                int result = get_address(_address, sizeof(_address), &kp.pub);
                 switch (result) {
                     case -2:
                         THROW(EXCEPTION_OVERFLOW);
@@ -72,7 +72,7 @@ UX_STEP_NOCB_INIT(
     gen_address(),
     {
       .title = "Address",
-      .text = address,
+      .text = _address,
     });
 UX_STEP_VALID(
     ux_display_public_flow_5_step,
@@ -112,13 +112,15 @@ UX_STEP_TIMEOUT(
 UX_FLOW(ux_processing_flow,
         &ux_processing_step);
 
-void handleGetAddress(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint32_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx)
+void handle_get_address(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
+                        uint32_t dataLength, volatile unsigned int *flags,
+                        volatile unsigned int *tx)
 {
     UNUSED(dataLength);
     UNUSED(p2);
 
-    address[0] = '\0';
-    account = read_uint32_be(dataBuffer);
+    _address[0] = '\0';
+    _account = read_uint32_be(dataBuffer);
 
     ux_flow_init(0, ux_processing_flow, NULL);
     *flags |= IO_ASYNCH_REPLY;
