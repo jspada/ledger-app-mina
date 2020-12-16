@@ -6,162 +6,785 @@ import sys
 import json
 import requests
 import binascii
+import ctypes
 
 COIN = 1000000000
 
-construction_payloads_request = json.loads(r"""{"network_identifier":{"blockchain":"coda","network":"debug"},"operations":[{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","metadata":{"token_id":"1"}},"amount":{"value":"-2000000000","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"payment_source_dec","status":"Pending","account":{"address":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","metadata":{"token_id":"1"}},"amount":{"value":"-5000000000","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":2},"related_operations":[{"index":1}],"type":"payment_receiver_inc","status":"Pending","account":{"address":"B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv","metadata":{"token_id":"1"}},"amount":{"value":"5000000000","currency":{"symbol":"CODA","decimals":9}}}],"metadata":{"sender":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","nonce":"0","token_id":"1"},"public_keys":[]}""")
+ROSETTA_SERVER = "http://localhost:3087"
+NETWORK = "debug"
+VERBOSE = False
 
-construction_metadata_request = json.loads(r"""{"network_identifier":{"blockchain":"coda","network":"debug"},"options":{"sender":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","token_id":"1"},"public_keys":[]}""")
+TX_TYPE_PAYMENT    = 0x00
+TX_TYPE_DELEGATION = 0x04
+MAX_VALID_UNTIL    = ctypes.c_uint32(-1).value
+
+def valid_memo(memo):
+    if memo is None or len(memo) > 32:
+        raise argparse.ArgumentTypeError("Memo must be at most 32 bytes")
+    else:
+        return memo
+
+def valid_valid_until(valid_until):
+    if valid_until is None or int(valid_until) > MAX_VALID_UNTIL:
+        raise argparse.ArgumentTypeError("Valid until must be at most {}".format(MAX_VALID_UNTIL))
+    else:
+        return int(valid_until)
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--verbose', default=False, action="store_true", help='Verbose mode')
 subparsers = parser.add_subparsers(dest='operation')
 subparsers.required = True
 get_address_parser = subparsers.add_parser('get-address')
-get_address_parser.add_argument('account_number', help='BIP32 account to retrieve. e.g. 12.')
+get_address_parser.add_argument('account_number', help='BIP32 account to retrieve. e.g. 42.')
 send_payment_parser = subparsers.add_parser('send-payment')
-send_payment_parser.add_argument('sender_bip44_account', help='BIP32 account to send from (e.g. 12)')
-send_payment_parser.add_argument('sender_address', help='Coda address of sender')
-send_payment_parser.add_argument('receiver', help='Coda address of recipient')
+send_payment_parser.add_argument('sender_bip44_account', help='BIP32 account to send from (e.g. 42)')
+send_payment_parser.add_argument('sender_address', help='Mina address of sender')
+send_payment_parser.add_argument('receiver', help='Mina address of recipient')
 send_payment_parser.add_argument('amount', help='Payment amount you want to send')
 send_payment_parser.add_argument('--rosetta_server', help='Rosetta server (default http://localhost:3087)')
-send_payment_parser.add_argument('--fee', help='Max fee')
+send_payment_parser.add_argument('--network', help='Network override')
+send_payment_parser.add_argument('--fee', help='Fee override')
 send_payment_parser.add_argument('--nonce', help='Nonce override')
+send_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
+send_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
+delegate_payment_parser = subparsers.add_parser('delegate')
+delegate_payment_parser.add_argument('delegator_bip44_account', help='BIP32 account of delegator (e.g. 42)')
+delegate_payment_parser.add_argument('delegator_address', help='Address of delegator')
+delegate_payment_parser.add_argument('delegate', help='Address of delegate')
+delegate_payment_parser.add_argument('--rosetta_server', help='Rosetta server (default http://localhost:3087)')
+delegate_payment_parser.add_argument('--network', help='Network override')
+delegate_payment_parser.add_argument('--fee', help='Fee override')
+delegate_payment_parser.add_argument('--nonce', help='Nonce override')
+delegate_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
+delegate_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
 
 args = parser.parse_args()
+VERBOSE = args.verbose
+
+def rosetta_network_request():
+    network_request = json.loads(r"""{
+        "metadata": {}
+    }""")
+
+    # Query
+    print("Getting network identifier... ", end="", flush=True)
+    network_resp = requests.post(ROSETTA_SERVER + '/network/list',
+                                data=json.dumps(network_request)).json()
+
+    # Validate
+    if "network_identifiers" not in network_resp:
+        print("error")
+        if VERBOSE:
+            print("\nNETWORK_RESP = {}\n".format(network_resp))
+        raise Exception("Failed to get network identifiers")
+    network_identifiers = network_resp["network_identifiers"]
+    if len(network_identifiers) < 1:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nNETWORK_RESP = {}\n".format(network_resp))
+        raise Exception("Empty network identifiers")
+    identifier = network_identifiers[0]
+    if identifier["blockchain"] != "coda":
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nNETWORK_RESP = {}\n".format(network_resp))
+        raise Exception("Invalid blockchain {}".format(identifier["blockchain"]))
+    print("{}".format(NETWORK), flush=True)
+
+    return identifier["network"]
+
+def rosetta_metadata_request(sender_address):
+    construction_metadata_request = json.loads(r"""{
+        "network_identifier": {
+            "blockchain": "coda",
+            "network": ""
+        },
+        "options": {
+            "sender": "",
+            "token_id": "1"
+        },
+        "public_keys": []
+    }""")
+
+    # Lookup the senders nonce and suggested fee
+    construction_metadata_request["network_identifier"]["network"] = NETWORK
+    construction_metadata_request["options"]["sender"] = sender_address;
+
+    print("Getting account nonce and suggested fee... ", end="", flush=True)
+    metadata_resp = requests.post(ROSETTA_SERVER + '/construction/metadata',
+                                  data=json.dumps(construction_metadata_request)).json()
+    if "metadata" not in metadata_resp:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nMETADATA_RESP = {}\n".format(metadata_resp))
+        raise Exception("Failed to get metadata")
+    if "suggested_fee" not in metadata_resp:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nMETADATA_RESP = {}\n".format(metadata_resp))
+        raise Exception("Failed to get suggested fee")
+    print("done", flush=True)
+
+    nonce = int(metadata_resp["metadata"]["nonce"]);
+    fee = float(metadata_resp["suggested_fee"][0]["value"])/COIN
+
+    return (nonce, fee)
+
+def rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce):
+    construction_payloads_request = json.loads(r"""{
+        "network_identifier": {
+            "blockchain": "coda",
+            "network": ""
+        },
+        "operations": [
+            {
+                "operation_identifier": {
+                    "index": 0
+                },
+                "related_operations": [],
+                "type": "fee_payer_dec",
+                "status": "Pending",
+                "account": {
+                    "address": "",
+                    "metadata": {
+                        "token_id": "1"
+                    }
+                },
+                "amount": {
+                    "value": "",
+                    "currency": {
+                        "symbol": "CODA",
+                        "decimals": 9
+                    }
+                }
+            },
+            {
+                "operation_identifier": {
+                    "index": 1
+                },
+                "related_operations": [],
+                "type": "payment_source_dec",
+                "status": "Pending",
+                "account": {
+                    "address": "",
+                    "metadata": {
+                        "token_id": "1"
+                    }
+                },
+                "amount": {
+                    "value": "",
+                    "currency": {
+                        "symbol": "CODA",
+                        "decimals": 9
+                    }
+                }
+            },
+            {
+                "operation_identifier": {
+                    "index": 2
+                },
+                "related_operations": [
+                    {
+                        "index": 1
+                    }
+                ],
+                "type": "payment_receiver_inc",
+                "status": "Pending",
+                "account": {
+                    "address": "",
+                    "metadata": {
+                        "token_id": "1"
+                    }
+                },
+                "amount": {
+                    "value": "",
+                    "currency": {
+                        "symbol": "CODA",
+                        "decimals": 9
+                    }
+                }
+            }
+        ],
+        "metadata": {
+            "sender": "",
+            "nonce": "",
+            "token_id": "1"
+        },
+        "public_keys": []
+    }""")
+
+    # Network
+    construction_payloads_request["network_identifier"]["network"] = NETWORK
+
+    # Fee details
+    construction_payloads_request["operations"][0]["account"]["address"] = sender
+    construction_payloads_request["operations"][0]["amount"]["value"] = '-{}'.format(int(fee*COIN))
+
+    # Payment source
+    construction_payloads_request["operations"][1]["account"]["address"] = sender
+    construction_payloads_request["operations"][1]["amount"]["value"] = '-{}'.format(int(amount*COIN))
+
+    # Receiver
+    construction_payloads_request["operations"][2]["account"]["address"] = receiver
+    construction_payloads_request["operations"][2]["amount"]["value"] = '{}'.format(int(amount*COIN))
+
+    # Nonce
+    construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
+
+    print("Constructing unsigned payment transaction... ", end="", flush=True)
+    payloads_resp = requests.post(ROSETTA_SERVER + '/construction/payloads',
+                                  data=json.dumps(construction_payloads_request)).json()
+    if "unsigned_transaction" not in payloads_resp:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+        raise Exception("Failed to get unsigned transaction")
+    payload = json.loads(payloads_resp["unsigned_transaction"])
+    if "payment" not in payload or payload["payment"] == None:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+        raise Exception("Failed to get payment info")
+    print("done", flush=True)
+
+    return payload, payload["payment"]
+
+def rosetta_delegation_payloads_request(delegator, delegate, fee, nonce):
+    construction_payloads_request = json.loads(r"""{
+        "network_identifier": {
+            "blockchain": "coda",
+            "network": ""
+        },
+        "operations": [
+            {
+                "operation_identifier": {
+                    "index": 0
+                },
+                "related_operations": [],
+                "type": "fee_payer_dec",
+                "status": "Pending",
+                "account": {
+                    "address": "",
+                    "metadata": {
+                        "token_id": "1"
+                    }
+                },
+                "amount": {
+                    "value": "",
+                    "currency": {
+                        "symbol": "CODA",
+                        "decimals": 9
+                    }
+                }
+            },
+            {
+                "operation_identifier": {
+                    "index": 1
+                },
+                "related_operations": [],
+                "type": "delegate_change",
+                "status": "Pending",
+                "account": {
+                    "address": ""
+                },
+                "metadata": {
+                    "delegate_change_target": ""
+                }
+            }
+        ],
+        "metadata": {
+            "sender": "",
+            "nonce": "",
+            "token_id": "1"
+        },
+        "public_keys": []
+    }""")
+
+    # Network
+    construction_payloads_request["network_identifier"]["network"] = NETWORK
+
+    # Fee details
+    construction_payloads_request["operations"][0]["account"]["address"] = delegator
+    construction_payloads_request["operations"][0]["amount"]["value"] = '-{}'.format(int(fee*COIN))
+
+    # Delegate_change
+    construction_payloads_request["operations"][1]["account"]["address"] = delegator
+    construction_payloads_request["operations"][1]["metadata"]["delegate_change_target"] = delegate
+
+    # Sender
+    construction_payloads_request["metadata"]["sender"] = delegator
+
+    # Nonce
+    construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
+
+    print("Constructing unsigned delegate transaction... ", end="", flush=True)
+    payloads_resp = requests.post(ROSETTA_SERVER + '/construction/payloads',
+                                  data=json.dumps(construction_payloads_request)).json()
+    if "unsigned_transaction" not in payloads_resp:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+        raise Exception("Failed to get unsigned transaction")
+    payload = json.loads(payloads_resp["unsigned_transaction"])
+    if "stakeDelegation" not in payload or payload["stakeDelegation"] == None:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+        raise Exception("Failed to get payment info") # TODO update all this
+    print("done", flush=True)
+
+    return payload, payload["stakeDelegation"]
+
+def rosetta_combine_request(payload, signature, tx_type):
+    construction_combine_request = json.loads(r"""{
+        "network_identifier": {
+            "blockchain": "coda",
+            "network": ""
+        },
+        "unsigned_transaction": "",
+        "signatures": [
+            {
+                "signing_payload": {
+                    "address": "",
+                    "account_identifer": "",
+                    "hex_bytes": "",
+                    "signature_type": ""
+                },
+                "signature_type": "schnorr_poseidon",
+                "public_key": {
+                    "hex_bytes": "",
+                    "curve_type": ""
+                },
+                "hex_bytes": ""
+            }
+        ]
+    }""")
+
+    # Construct signed transaction
+    construction_combine_request["network_identifier"]["network"] = NETWORK
+
+    # Set unsigned transaction
+    construction_combine_request["unsigned_transaction"] = json.dumps(payload)
+
+    # Set signature hex_bytes
+    construction_combine_request["signatures"][0]["hex_bytes"] = signature
+
+    print("Constructing signed transaction... ", end="", flush=True)
+    combine_resp = requests.post(ROSETTA_SERVER + '/construction/combine',
+                                 data=json.dumps(construction_combine_request)).json()
+
+    if "signed_transaction" not in combine_resp:
+        print("error")
+        if VERBOSE:
+            print("\nCOMBINE_RESP = {}\n".format(combine_resp))
+        raise Exception("Failed to construct signed transaction")
+    payload = json.loads(combine_resp["signed_transaction"])
+
+    if tx_type == "send-payment":
+        if "payment" not in payload or payload["payment"] == None:
+            print("error")
+            if VERBOSE:
+                print("\nCOMBINE_RESP = {}\n".format(combine_resp))
+                raise Exception("Failed to get payment info")
+        signed_tx = payload["payment"]
+    else:
+        if "stake_delegation" not in payload or payload["stake_delegation"] == None:
+            print("error")
+            if VERBOSE:
+                print("\nCOMBINE_RESP = {}\n".format(combine_resp))
+                raise Exception("Failed to get stakeDelegation info")
+        signed_tx = payload["stake_delegation"]
+    print("done", flush=True)
+
+    return payload, signed_tx
+
+def rosetta_submit_request(signed_tx):
+    construction_submit_request = json.loads(r"""{
+        "network_identifier": {
+        "blockchain": "coda",
+        "network": ""
+        },
+        "signed_transaction": ""
+    }""")
+
+    construction_submit_request["network_identifier"]["network"] = NETWORK
+    construction_submit_request["signed_transaction"] = json.dumps(signed_tx)
+
+    print("Sending transaction... ", end="", flush=True)
+    submit_resp = requests.post(ROSETTA_SERVER + '/construction/submit',
+                                data=json.dumps(construction_submit_request)).json()
+
+    if "transaction_identifier" not in submit_resp:
+        print("error")
+        if VERBOSE:
+            print("\nSUBMIT_RESP = {}\n".format(submit_resp))
+        if "code" in submit_resp and "details" in submit_resp:
+            raise Exception(submit_resp["details"]["body"][1])
+        else:
+            raise Exception("Failed to submit transaction")
+    print("done", flush=True)
+
+    return submit_resp["transaction_identifier"]["hash"]
+
+def rosetta_balance_request(address):
+    account_balance_request = json.loads(r"""{
+    	"network_identifier": {
+    		"blockchain": "coda",
+    		"network": ""
+    	},
+    	"account_identifier": {
+    		"address": ""
+    	},
+    	"metadata": {}
+    }""")
+
+    account_balance_request["network_identifier"]["network"] = NETWORK
+    account_balance_request["account_identifier"]["address"] = address
+
+    print("Getting account balance... ", end="", flush=True)
+    balance_resp = requests.post(ROSETTA_SERVER + '/account/balance',
+                                data=json.dumps(account_balance_request)).json()
+
+    if "balances" not in balance_resp:
+        print("error")
+        if VERBOSE:
+            print("\nBALANCE_RESP = {}\n".format(balance_resp))
+        raise Exception("Failed to get balance")
+    print("done", flush=True)
+
+    return int(balance_resp["balances"][0]["value"])/COIN
+
+def rosetta_parse_request(tx):
+    construction_parse_request = json.loads(r"""{
+        "network_identifier": {
+            "blockchain": "coda",
+            "network": ""
+        },
+        "transaction": ""
+    }""")
+
+    construction_parse_request["network_identifier"]["network"] = NETWORK
+    construction_parse_request["transaction"] = json.dumps(tx)
+    print(json.dumps(construction_parse_request))
+    print("Checking transaction... ", end="", flush=True)
+    parse_resp = requests.post(ROSETTA_SERVER + '/construction/parse',
+                                data=json.dumps(construction_parse_request)).json()
+
+    if "operations" not in parse_resp:
+        print("error")
+        if VERBOSE:
+            print("\nPARSE_RESP = {}\n".format(parse_resp))
+        raise Exception("Failed to parse transaction")
+    print("done", flush=True)
+
+def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee, nonce, valid_until, memo):
+    sender_bip44_account = '{:08x}'.format(int(sender_account))
+    sender_address = sender_address.encode().hex()
+    receiver = receiver.encode().hex()
+    amount = '{:016x}'.format(int(amount))
+    fee = '{:016x}'.format(int(fee))
+    nonce = '{:08x}'.format(nonce)
+    valid_until = '{:08x}'.format(valid_until)
+    memo = memo.ljust(32, '\x00')[:32].encode().hex()
+    tag = '{:02x}'.format(tx_type)
+
+    total_len = len(sender_bip44_account) \
+                + len(sender_address) \
+                + len(receiver) \
+                + len(amount) \
+                + len(fee) \
+                + len(nonce) \
+                + len(valid_until) \
+                + len(memo) \
+                + len(tag)
+
+    # Create APDU message.
+    #     CLA 0xE0  CLA
+    #     INS 0x03  INS_SIGN_TX
+    #     P1  0x00  UNUSED
+    #     P2  0x00  UNUSED
+    apduMessage = 'E0030000' + '{:08x}'.format(total_len + 4) \
+                  + sender_bip44_account \
+                  + sender_address \
+                  + receiver \
+                  + amount \
+                  + fee \
+                  + nonce \
+                  + valid_until \
+                  + memo \
+                  + tag
+
+    apdu = bytearray.fromhex(apduMessage)
+    print("Signing transaction (please confirm on Ledger device)... ", end="", flush=True)
+    signature = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
+    print("done", flush=True)
+
+    return signature;
+
+def tx_type_name(op):
+    if op == "send-payment":
+        return "Payment"
+    elif op == "delegate":
+        return "Delegation"
+
+def payment_tx_check(tx, sender, receiver, amount, fee, valid_until, nonce, memo):
+    return tx["from"] == sender and \
+           tx["to"] == receiver and \
+           float(tx["amount"])/COIN == amount and \
+           float(tx["fee"])/COIN == fee and \
+           ((tx["valid_until"] is not None and \
+            tx["valid_until"] == str(valid_until)) or \
+           (tx["valid_until"] is None and valid_until == MAX_VALID_UNTIL)) and \
+            tx["nonce"] == str(nonce) and \
+           ((tx["memo"] is not None and tx["memo"] == memo) or \
+            (tx["memo"] is None and memo == ""))
+
+def delegate_tx_check(tx, delegator, delegate, fee, valid_until, nonce, memo):
+    return tx["delegator"] == delegator and \
+           tx["new_delegate"] == delegate and \
+           float(tx["fee"])/COIN == fee and \
+           ((tx["valid_until"] is not None and \
+            tx["valid_until"] == str(valid_until)) or \
+           (tx["valid_until"] is None and valid_until == MAX_VALID_UNTIL)) and \
+            tx["nonce"] == str(nonce) and \
+            ((tx["memo"] is not None and tx["memo"] == memo) or \
+            (tx["memo"] is None and memo == ""))
 
 try:
-        dongle = ledgerblue.getDongle(debug=False)
+    dongle = ledgerblue.getDongle(debug=False)
 
-        if args.operation == 'get-address':
-                # Create APDU message.
-                # CLA 0xE0  CLA
-                # INS 0x02  INS_GET_ADDR
-                # P1 0x00   UNUSED
-                # P2 0x00   UNUSED
-                account = '{:08x}'.format(int(args.account_number))
-                apduMessage = 'E0020000' + '{:08x}'.format(len(account) + 4) + account
-                apdu = bytearray.fromhex(apduMessage)
-                print("Get address for account {} (BIP44 path m/44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(args.account_number, args.account_number))
+    if args.operation == 'get-address':
+        # Create APDU message.
+        # CLA 0xE0  CLA
+        # INS 0x02  INS_GET_ADDR
+        # P1 0x00   UNUSED
+        # P2 0x00   UNUSED
+        account = '{:08x}'.format(int(args.account_number))
+        apduMessage = 'E0020000' + '{:08x}'.format(len(account) + 4) + account
+        apdu = bytearray.fromhex(apduMessage)
+        print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(args.account_number, args.account_number))
 
-                while True:
-                    answer = str(input("Continue? (y/N) ")).lower().strip()
-                    if answer == 'y':
-                        break
-                    else:
-                        sys.exit(211)
+        while True:
+            answer = str(input("Continue? (y/N) ")).lower().strip()
+            if answer == 'y':
+                break
+            else:
+                sys.exit(211)
 
-                print("Generating address... (Please confirm on Ledger device)")
-                address = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
-                print('Received address: {}'.format(address))
+        print("Generating address (please confirm on Ledger device)... ", end="", flush=True)
+        address = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
+        print("done")
+        print('Received address: {}'.format(address))
 
-        elif args.operation == "send-payment":
-                if args.rosetta_server is None:
-                        args.rosetta_server = "http://localhost:3087"
+    elif args.operation == "send-payment" or args.operation == "delegate":
+        # Set common user supplied parameters
+        if args.operation == "send-payment":
+            account = args.sender_bip44_account
+            sender = args.sender_address
+            receiver = args.receiver
+            amount = float(args.amount)
+        else:
+            account = args.delegator_bip44_account
+            sender = args.delegator_address
+            receiver = args.delegate
+            amount = 0
 
-                # Lookup the senders nonce and suggested fee
-                construction_metadata_request["options"]["sender"] = args.sender_address;
+        # Set optional memo
+        memo = args.memo if args.memo is not None else ""
+        memo = memo[:32] if len(memo) > 32 else memo
 
-                resp = requests.post(args.rosetta_server + '/construction/metadata',
-                                     data=json.dumps(construction_metadata_request)).json()
-                if "metadata" not in resp:
-                        print("Failed to get metadata")
-                        raise Exception("Unable to connect to Mina rosetta port ({})".format(args.rosetta_server))
-                nonce = int(resp["metadata"]["nonce"]);
-                fee = float(resp["suggested_fee"][0]["value"])/COIN
-                if args.fee is not None:
-                    fee = float(args.fee)
-                if args.nonce is not None:
-                    nonce = int(args.nonce)
+        # Optional valid_until override
+        if args.valid_until is not None:
+            print("Using valid_until override: {}".format(args.valid_until))
+        valid_until = args.valid_until if args.valid_until is not None else ""
 
-                amount = float(args.amount)
+        if args.rosetta_server is not None:
+            # Rosetta server override
+            ROSETTA_SERVER = args.rosetta_server
 
-                # Fee details
-                construction_payloads_request["operations"][0]["account"]["address"] = args.sender_address;
-                construction_payloads_request["operations"][0]["amount"]["value"] = '-{}'.format(int(fee*COIN))
+        # Lookup the network
+        NETWORK = rosetta_network_request()
 
-                # Payment source
-                construction_payloads_request["operations"][1]["account"]["address"] = args.sender_address;
-                construction_payloads_request["operations"][1]["amount"]["value"] = '-{}'.format(int(amount*COIN));
+        if args.network is not None:
+            # Rosetta server override
+            print("Using network override: {}".format(args.network))
+            NETWORK = args.network
 
-                # Receiver
-                construction_payloads_request["operations"][2]["account"]["address"] = args.receiver;
-                construction_payloads_request["operations"][2]["amount"]["value"] = '{}'.format(int(amount*COIN));
+        # Lookup the senders nonce and suggested fee
+        nonce, fee = rosetta_metadata_request(sender)
 
-                print()
-                print("Payment details:")
-                print("    Account:  {}".format(args.sender_bip44_account))
-                print("    Sender:   {} (m/44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(construction_payloads_request["operations"][0]["account"]["address"], args.sender_bip44_account))
-                print("    Amount:   {:.9f}".format(amount))
-                print("    Nonce:    {}".format(nonce))
-                print("    Fee:      {:.9f}".format(fee))
-                print("    Receiver: {}".format(construction_payloads_request["operations"][2]["account"]["address"]))
-                print()
+        # Apply optional overrides
+        if args.fee is not None:
+            print("Using fee override: {}".format(args.fee))
+            fee = float(args.fee)
+        if args.nonce is not None:
+            print("Using nonce override: {}".format(args.nonce))
+            nonce = int(args.nonce)
 
-                while True:
-                    answer = str(input("Continue? (y/N) ")).lower().strip()
-                    if answer == 'y':
-                        break
-                    else:
-                        sys.exit(211)
+        balance = rosetta_balance_request(sender)
 
-                # print(json.dumps(construction_payloads_request))
-                resp = requests.post(args.rosetta_server + '/construction/payloads',
-                                     data=json.dumps(construction_payloads_request)).json()
+        print()
+        print("Sign transaction:")
+        print("    Type:        {}".format(tx_type_name(args.operation)))
+        print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0'/0')".format(account, account))
 
-                if "unsigned_transaction" not in resp:
-                        print("Failed to get unsigned transaction")
-                        raise
-                unsigned_tx = json.loads(resp["unsigned_transaction"])
+        if args.operation == "send-payment":
+            print("    Sender:      {} (balance {})".format(sender, balance))
+            print("    Receiver:    {}".format(receiver))
+            print("    Amount:      {:.9f}".format(amount))
+        else:
+            print("    Delegator:   {} (balance {})".format(sender, balance))
+            print("    Delegate:    {}".format(receiver))
 
-                if "payment" not in unsigned_tx or unsigned_tx["payment"] == None:
-                        print("Failed to get payment info")
-                        raise
-                payment = unsigned_tx["payment"]
-                # Create APDU message.
-                # CLA 0xE0  CLA
-                # INS 0x03  INS_SIGN_PAYMENT_TX
-                # P1 0x00   UNUSED
-                # P2 0x00   UNUSED
-                sender_bip44_account = '{:08x}'.format(int(args.sender_bip44_account))
-                sender_address = payment["from"].encode().hex()
-                receiver = payment["to"].encode().hex()
-                amount = '{:016x}'.format(int(payment["amount"]))
-                fee = '{:016x}'.format(int(payment["fee"]))
-                nonce = '{:016x}'.format(nonce)
-                random_oracle_input = unsigned_tx["randomOracleInput"]
+        print("    Fee:         {:.9f}".format(fee))
+        if args.operation == "send-payment":
+            print("    Total:       {:.9f}".format(amount + fee))
+        print("    Nonce:       {}".format(nonce))
 
-                total_len = len(sender_bip44_account) \
-                            + len(sender_address) \
-                            + len(receiver) \
-                            + len(amount) \
-                            + len(fee) \
-                            + len(nonce) \
-                            + len(random_oracle_input)
+        if valid_until != "":
+            print("    Valid until: {}".format(valid_until))
+        if memo != "":
+            print("    Memo:        {}".format(memo))
+        print()
+        if args.operation == "delegate":
+            print("    The entire balance will be delegated.")
+            print()
 
-                apduMessage = 'E0030000' + '{:08x}'.format(total_len + 4) \
-                              + sender_bip44_account \
-                              + sender_address \
-                              + receiver \
-                              + amount \
-                              + fee \
-                              + nonce \
-                              + random_oracle_input
+        answer = str(input("Continue? (y/N) ")).lower().strip()
+        if answer != 'y':
+            sys.exit(211)
+        print()
 
-                apdu = bytearray.fromhex(apduMessage)
-                print("Signing transaction... (Please confirm on Ledger device)")
-                address = dongle.exchange(apdu).decode('utf-8').rstrip('\x00')
-                print('Received signature: {}'.format(address))
+        # Construct unsigned tx
+        if args.operation == "send-payment":
+            unsigned_payload, unsigned_tx = rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce)
+        else:
+            unsigned_payload, unsigned_tx = rosetta_delegation_payloads_request(sender, receiver, fee, nonce)
 
-                print("Sending payment...")
+        # Load valid_until
+        if valid_until == "":
+            valid_until = unsigned_tx["valid_until"]
+            if valid_until == None:
+                # None means valid forever
+                valid_until = MAX_VALID_UNTIL
+        else:
+            # Apply valid_until override
+            unsigned_tx["valid_until"] = str(valid_until)
+
+        if memo != "":
+            # Apply memo override
+            unsigned_tx["memo"] = memo
+
+        if VERBOSE:
+            print("\nUNSIGNED_TX = {}\n".format(json.dumps(unsigned_payload)))
+
+        # # Rosetta parse
+        # rosetta_parse_request(unsigned_tx)
+
+        if args.operation == "send-payment":
+            # Security check rosetta output 1
+            if not payment_tx_check(unsigned_tx, sender, receiver, amount, fee, valid_until, nonce, memo):
+                raise Exception("Rosetta unsigned payment tx diverges from user supplied tx parameters")
+            signature = ledger_sign_tx(TX_TYPE_PAYMENT,
+                                       account,
+                                       unsigned_tx["from"],
+                                       unsigned_tx["to"],
+                                       unsigned_tx["amount"],
+                                       unsigned_tx["fee"],
+                                       nonce,
+                                       valid_until,
+                                       memo)
+        else:
+            # Security check rosetta output 1
+            if not delegate_tx_check(unsigned_tx, sender, receiver, fee, valid_until, nonce, memo):
+                raise Exception("Rosetta unsigned delegate tx diverges from user supplied tx parameters")
+            signature = ledger_sign_tx(TX_TYPE_DELEGATION,
+                                       account,
+                                       unsigned_tx["delegator"],
+                                       unsigned_tx["new_delegate"],
+                                       0,
+                                       unsigned_tx["fee"],
+                                       nonce,
+                                       valid_until,
+                                       memo)
+
+        if VERBOSE:
+            print('Received signature: {}'.format(signature))
+
+        # Combine signature and unsigned_tx to create signed_tx
+        signed_payload, signed_tx = rosetta_combine_request(unsigned_payload, signature, args.operation)
+
+        if valid_until != "":
+            # Apply valid_until override (again)
+            signed_tx["valid_until"] = str(valid_until)
+
+        if memo != "":
+            # Apply memo override (again)
+            signed_tx["memo"] = memo
+
+        if VERBOSE:
+            print("\nSIGNED_TX   = {}\n".format(json.dumps(signed_payload)))
+
+        # # Rosetta parse
+        # rosetta_parse_request(signed_tx)
+
+        # Security check rosetta output 2
+        if args.operation == "send-payment":
+            if not payment_tx_check(signed_tx, sender, receiver, amount, fee, valid_until, nonce, memo):
+                raise Exception("Rosetta signed payment tx diverges from user supplied tx parameters")
+        else:
+            if not delegate_tx_check(signed_tx, sender, receiver, fee, valid_until, nonce, memo):
+                raise Exception("Rosetta signed delegate tx diverges from user supplied tx parameters")
+        if signed_payload["signature"] != signature:
+            raise Exception("Rosetta tx signature diverges")
+
+        print()
+        print("Send transaction:")
+        print("    Type:        {}".format(tx_type_name(args.operation)))
+        print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0'/0')".format(account, account))
+
+        if args.operation == "send-payment":
+            print("    Sender:      {} (balance {})".format(signed_tx["from"], balance))
+            print("    Receiver:    {}".format(signed_tx["to"]))
+            print("    Amount:      {:.9f}".format(int(signed_tx["amount"])/float(COIN)))
+        else:
+            print("    Delegator:   {} (balance {})".format(signed_tx["delegator"], balance))
+            print("    Delegate:    {}".format(signed_tx["new_delegate"]))
+
+        print("    Fee:         {:.9f}".format(int(signed_tx["fee"])/float(COIN)))
+        if args.operation == "send-payment":
+            print("    Total:       {:.9f}".format(amount + fee))
+        print("    Nonce:       {}".format(signed_tx["nonce"]))
+
+        if valid_until != MAX_VALID_UNTIL:
+            print("    Valid until: {}".format(valid_until))
+        if memo != "":
+            print("    Memo:        {}".format(memo))
+
+        print("    Signature:   {}...".format(signed_payload["signature"][0:74]))
+        print()
+        if args.operation == "delegate":
+            print("    The entire balance will be delegated.")
+            print()
+
+        answer = str(input("Continue? (y/N) ")).lower().strip()
+        if answer != 'y':
+            sys.exit(211)
+        print()
+
+        tx_hash = rosetta_submit_request(signed_payload)
+
+        print()
+        print("Transaction id: {}".format(tx_hash))
 
 except ledgerblue.CommException as ex:
-        if ex.sw == 26368:
-                print("Ledger app not open")
-        else:
-                print("Failed to communicate with ledger device (error = {})".format(ex.sw))
+    if ex.sw == 26368:
+        print("Ledger app not open")
+    else:
+        print("Failed to communicate with ledger device (error = {})".format(ex.sw))
         sys.exit(233)
 except AssertionError:
-        raise
+    raise
 except Exception as ex:
-        print("Error: {}".format(ex))
-        sys.exit(233)
+    print("Error: {}".format(ex))
+    sys.exit(233)

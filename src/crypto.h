@@ -12,8 +12,8 @@
 #define SCALAR_BITS    256
 #define SCALAR_OFFSET  2   // Scalars have 254 used bits
 
-#define SIGNATURE_LEN    64
-#define MINA_ADDRESS_LEN 56 // includes null-byte
+#define SIGNATURE_LEN    129 // as strings,
+#define MINA_ADDRESS_LEN 56  // includes null-bytes
 
 #define COIN 1000000000ULL
 

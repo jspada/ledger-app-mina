@@ -18,7 +18,7 @@ static Field       _input_fields[3];
 static uint8_t     _input_bits[TX_BITSTRINGS_BYTES];
 static ROInput     _roinput;
 static Signature   _sig;
-static char        _signature[2*SIGNATURE_LEN + 1];
+static char        _sig_hex[SIGNATURE_LEN];
 
 // UI variables
 static struct ui_t {
@@ -27,13 +27,18 @@ static struct ui_t {
     char amount[32];
     char fee[32];
     char nonce[32];
+    char valid_until[32];
+    char memo[MEMO_BYTES - 1];
+    char type[11];
+    char sender_title[10];
+    char receiver_title[9];
 } _ui;
 
 static uint8_t set_result_get_signature()
 {
     uint8_t tx = 0;
-    os_memmove(G_io_apdu_buffer + tx, _signature, sizeof(_signature));
-    tx += sizeof(_signature);
+    os_memmove(G_io_apdu_buffer + tx, _sig_hex, sizeof(_sig_hex));
+    tx += sizeof(_sig_hex);
     return tx;
 }
 
@@ -70,9 +75,9 @@ static void sign_transaction()
 
             uint8_t *p = (uint8_t *)&_sig;
             for (size_t i = 0; i < sizeof(_sig); i++) {
-                snprintf(&_signature[i*2], 3, "%02x", p[i]);
+                snprintf(&_sig_hex[i*2], 3, "%02x", p[i]);
             }
-            _signature[sizeof(Signature)*2] = '\0';
+            _sig_hex[SIGNATURE_LEN - 1] = '\0';
 
         }
         FINALLY {
@@ -111,42 +116,63 @@ UX_FLOW(ux_signing_comfort_flow,
        &ux_signing_comfort_step);
 
 UX_STEP_NOCB(
-    ux_sign_payment_tx_flow_1_step,
+   ux_sign_tx_flow_0_step,
+   bnnn_paging,
+   {
+     .title = "Type",
+     .text = _ui.type,
+   });
+UX_STEP_NOCB(
+    ux_sign_tx_flow_1_step,
     bnnn_paging,
     {
-      .title = "From",
+      .title = _ui.sender_title,
       .text = _ui.sender,
     });
 UX_STEP_NOCB(
-    ux_sign_payment_tx_flow_2_step,
+    ux_sign_tx_flow_2_step,
     bnnn_paging,
     {
-      .title = "To",
+      .title = _ui.receiver_title,
       .text = _ui.receiver,
     });
 UX_STEP_NOCB(
-    ux_sign_payment_tx_flow_3_step,
+    ux_sign_tx_flow_amount_step,
     bn,
     {
       .line1 = "Amount",
       .line2 = _ui.amount,
     });
 UX_STEP_NOCB(
-    ux_sign_payment_tx_flow_4_step,
+    ux_sign_tx_flow_4_step,
     bn,
     {
       .line1 = "Fee",
       .line2 = _ui.fee,
     });
 UX_STEP_NOCB(
-    ux_sign_payment_tx_flow_5_step,
+    ux_sign_tx_flow_5_step,
     bn,
     {
       .line1 = "Nonce",
       .line2 = _ui.nonce,
     });
+UX_STEP_NOCB(
+    ux_sign_tx_flow_valid_until_step,
+    bn,
+    {
+      .line1 = "Valid until",
+      .line2 = _ui.valid_until,
+    });
+UX_STEP_NOCB(
+    ux_sign_tx_flow_memo_step,
+    bnnn_paging,
+    {
+      .title = "Memo",
+      .text = _ui.memo,
+    });
 UX_STEP_VALID(
-    ux_sign_payment_tx_flow_6_step,
+    ux_sign_tx_flow_6_step,
     pb,
     ux_flow_init(0, ux_signing_comfort_flow, NULL);,
     {
@@ -154,7 +180,7 @@ UX_STEP_VALID(
       "Approve",
     });
 UX_STEP_VALID(
-    ux_sign_payment_tx_flow_7_step,
+    ux_sign_tx_flow_7_step,
     pb,
     sendResponse(0, false),
     {
@@ -163,14 +189,95 @@ UX_STEP_VALID(
     });
 
 UX_FLOW(ux_sign_payment_tx_flow,
-        &ux_sign_payment_tx_flow_1_step,
-        &ux_sign_payment_tx_flow_2_step,
-        &ux_sign_payment_tx_flow_3_step,
-        &ux_sign_payment_tx_flow_4_step,
-        &ux_sign_payment_tx_flow_5_step,
-        &ux_sign_payment_tx_flow_6_step,
-        &ux_sign_payment_tx_flow_7_step
-    );
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_amount_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_payment_tx_flow_valid_until,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_amount_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_valid_until_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_payment_tx_flow_memo,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_amount_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_memo_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_payment_tx_flow_all,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_valid_until_step,
+    &ux_sign_tx_flow_memo_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_delegate_tx_flow,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_delegate_tx_flow_valid_until,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_valid_until_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_delegate_tx_flow_memo,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_memo_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
+
+UX_FLOW(ux_sign_delegate_tx_flow_all,
+    &ux_sign_tx_flow_0_step,
+    &ux_sign_tx_flow_1_step,
+    &ux_sign_tx_flow_2_step,
+    &ux_sign_tx_flow_4_step,
+    &ux_sign_tx_flow_5_step,
+    &ux_sign_tx_flow_valid_until_step,
+    &ux_sign_tx_flow_memo_step,
+    &ux_sign_tx_flow_6_step,
+    &ux_sign_tx_flow_7_step
+);
 
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
                     uint32_t dataLength, volatile unsigned int *flags,
@@ -179,12 +286,11 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     UNUSED(dataLength);
     UNUSED(p2);
 
-    // TODO: Check dataLength is valid
-    if (dataLength != 638) {
+    if (dataLength != 346) {
         THROW(INVALID_PARAMETER);
     }
 
-    _signature[0] = '\0';
+    _sig_hex[0] = '\0';
 
     // 0-3: sender_bip44_account
     _account = read_uint32_be(dataBuffer);
@@ -194,7 +300,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _ui.sender[MINA_ADDRESS_LEN - 1] = '\0';
     read_public_key_compressed(&_tx.source_pk, _ui.sender);
 
-    // TODO fee_payer
+    // Always the same as sender for sent-payment and delegate txs
     read_public_key_compressed(&_tx.fee_payer_pk, _ui.sender);
 
     // 59-113: receiver
@@ -202,32 +308,89 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _ui.receiver[MINA_ADDRESS_LEN - 1] = '\0';
     read_public_key_compressed(&_tx.receiver_pk, _ui.receiver);
 
-    // 114-121:
+    // 114-121: amount
     _tx.amount = read_uint64_be(dataBuffer + 114);
     amount_to_string(_ui.amount, sizeof(_ui.amount), _tx.amount);
 
-    // TODO token_id
-    _tx.token_id = 1; // TODO
+    // Set to 1 until token support is released
+    _tx.token_id = 1;
 
     // 122-129: fee
     _tx.fee = read_uint64_be(dataBuffer + 122);
     amount_to_string(_ui.fee, sizeof(_ui.fee), _tx.fee);
 
-    // TODO fee_token
+    // Set to 1 until token support is released
     _tx.fee_token = 1;
 
-    // 130-137: nonce // TODO: change to 32bits
-    _tx.nonce = (uint32_t)read_uint64_be(dataBuffer + 130);
-    value_to_string(_ui.nonce, sizeof(_ui.nonce), (uint64_t)_tx.nonce);
+    // 130-133: nonce
+    _tx.nonce = read_uint32_be(dataBuffer + 130);
+    value_to_string(_ui.nonce, sizeof(_ui.nonce), _tx.nonce);
 
-    // TODO
-    _tx.valid_until = 10000;
-    _tx.tag[0] = 0;
-    _tx.tag[1] = 0;
-    _tx.tag[2] = 0;
+    // 134-137: valid_until
+    _tx.valid_until = read_uint32_be(dataBuffer + 134);
+    value_to_string(_ui.valid_until, sizeof(_ui.valid_until), _tx.valid_until);
+
+    // Fixed until token support is released
     _tx.token_locked = false;
-    transaction_prepare_memo(_tx.memo, "this is a memo");
 
-    ux_flow_init(0, ux_sign_payment_tx_flow, NULL);
+    // 138-169: memo
+    uint32_t memo[MEMO_BYTES - 2 + 1];
+    memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
+    memo[sizeof(_ui.memo) - 1] = '\0';
+    transaction_prepare_memo(_tx.memo, _ui.memo);
+
+    // 170: tag
+    uint8_t tag = *(dataBuffer + 170);
+    _tx.tag[0] = tag & 0x01;
+    _tx.tag[1] = tag & 0x02;
+    _tx.tag[2] = tag & 0x04;
+    if (tag == 0x00) {
+        strncpy(_ui.type, "Payment", sizeof(_ui.type));
+        strncpy(_ui.sender_title, "Sender", sizeof(_ui.sender_title));
+        strncpy(_ui.receiver_title, "Receiver", sizeof(_ui.receiver_title));
+
+        if (_tx.valid_until == (uint32_t)-1 && _ui.memo[0] == '\0') {
+            // Valid forever and no memo
+            ux_flow_init(0, ux_sign_payment_tx_flow, NULL);
+        }
+        else if (_ui.memo[0] == '\0') {
+            // Valid until and no memo
+            ux_flow_init(0, ux_sign_payment_tx_flow_valid_until, NULL);
+        }
+        else if (_tx.valid_until == (uint32_t)-1) {
+            // Valid forever and memo
+            ux_flow_init(0, ux_sign_payment_tx_flow_memo, NULL);
+        }
+        else {
+            // Valid until and memo
+            ux_flow_init(0, ux_sign_payment_tx_flow_all, NULL);
+        }
+    }
+    else if (tag == 0x04) {
+        strncpy(_ui.type, "Delegation", sizeof(_ui.type));
+        strncpy(_ui.sender_title, "Delegator", sizeof(_ui.sender_title));
+        strncpy(_ui.receiver_title, "Delegate", sizeof(_ui.receiver_title));
+
+        if (_tx.valid_until == (uint32_t)-1 && _ui.memo[0] == '\0') {
+            // Valid forever and no memo
+            ux_flow_init(0, ux_sign_delegate_tx_flow, NULL);
+        }
+        else if (_ui.memo[0] == '\0') {
+            // Valid until and no memo
+            ux_flow_init(0, ux_sign_delegate_tx_flow_valid_until, NULL);
+        }
+        else if (_tx.valid_until == (uint32_t)-1) {
+            // Valid forever and memo
+            ux_flow_init(0, ux_sign_delegate_tx_flow_memo, NULL);
+        }
+        else {
+            // Valid until and memo
+            ux_flow_init(0, ux_sign_delegate_tx_flow_all, NULL);
+        }
+    }
+    else {
+        THROW(INVALID_PARAMETER);
+    }
+
     *flags |= IO_ASYNCH_REPLY;
 }

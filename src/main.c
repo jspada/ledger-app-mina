@@ -23,9 +23,9 @@
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
 #define CLA 0xE0
-#define INS_GET_APP_CONFIGURATION 0x01
+#define INS_GET_CONF 0x01
 #define INS_GET_ADDR 0x02
-#define INS_SIGN_PAYMENT_TX 0x03
+#define INS_SIGN_TX  0x03
 
 #define OFFSET_CLA 0
 #define OFFSET_INS 1
@@ -46,7 +46,7 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
             uint32_t dataLength = read_uint32_be(G_io_apdu_buffer + OFFSET_LC);
             switch (G_io_apdu_buffer[OFFSET_INS]) {
 
-                case INS_GET_APP_CONFIGURATION:
+                case INS_GET_CONF:
                     G_io_apdu_buffer[0] = LEDGER_MAJOR_VERSION;
                     G_io_apdu_buffer[1] = LEDGER_MINOR_VERSION;
                     G_io_apdu_buffer[2] = LEDGER_PATCH_VERSION;
@@ -61,7 +61,7 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                                        dataLength, flags, tx);
                     break;
 
-            case INS_SIGN_PAYMENT_TX:
+            case INS_SIGN_TX:
                     handle_sign_tx(G_io_apdu_buffer[OFFSET_P1],
                                    G_io_apdu_buffer[OFFSET_P2],
                                    G_io_apdu_buffer + OFFSET_CDATA,
