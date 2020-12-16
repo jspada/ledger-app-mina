@@ -9,3 +9,4 @@ src/glyphs.h
 *~
 tests/utils_tests
 tests/random_oracle_input_tests
+utils/__pycache__

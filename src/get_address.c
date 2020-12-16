@@ -64,6 +64,19 @@ UX_FLOW(ux_display_public_flow,
   &ux_unit_tests_address_flow_4_step
 );
 
+UX_STEP_TIMEOUT(
+    ux_processing_step,
+    pb,
+    1,
+    ux_display_public_flow,
+    {
+      &C_icon_processing,
+      "Unit tests...",
+    });
+
+UX_FLOW(ux_processing_flow,
+        &ux_processing_step);
+
 #else
 
 UX_STEP_NOCB_INIT(
@@ -97,8 +110,6 @@ UX_FLOW(ux_display_public_flow,
   &ux_display_public_flow_6_step
 );
 
-#endif
-
 UX_STEP_TIMEOUT(
     ux_processing_step,
     pb,
@@ -111,6 +122,8 @@ UX_STEP_TIMEOUT(
 
 UX_FLOW(ux_processing_flow,
         &ux_processing_step);
+
+#endif
 
 void handle_get_address(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
                         uint32_t dataLength, volatile unsigned int *flags,
