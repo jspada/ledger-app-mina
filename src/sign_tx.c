@@ -338,7 +338,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _account = read_uint32_be(dataBuffer);
 
     // 4-58: sender_address
-    memcpy(_ui.sender, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
+    os_memcpy(_ui.sender, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
     _ui.sender[MINA_ADDRESS_LEN - 1] = '\0';
     read_public_key_compressed(&_tx.source_pk, _ui.sender);
 
@@ -346,7 +346,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     read_public_key_compressed(&_tx.fee_payer_pk, _ui.sender);
 
     // 59-113: receiver
-    memcpy(_ui.receiver, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
+    os_memcpy(_ui.receiver, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
     _ui.receiver[MINA_ADDRESS_LEN - 1] = '\0';
     read_public_key_compressed(&_tx.receiver_pk, _ui.receiver);
 
@@ -383,7 +383,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _tx.token_locked = false;
 
     // 138-169: memo
-    memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
+    os_memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
     _ui.memo[sizeof(_ui.memo) - 1] = '\0';
     transaction_prepare_memo(_tx.memo, _ui.memo);
 

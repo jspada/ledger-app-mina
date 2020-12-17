@@ -5,6 +5,13 @@
 #include "utils.h"
 #include "crypto.h"
 
+#ifdef LEDGER_BUILD
+    #include <os.h>
+#else
+    #define os_memset memset
+    #define os_memcpy memcpy
+#endif
+
 static const char B58_ALPHABET[] = {
     '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
     'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
@@ -27,7 +34,7 @@ int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
         return -1; // INVALID_PARAMETER
     }
     // TODO: os_memmove
-    memcpy(tmp, in, length);
+    os_memcpy(tmp, in, length);
     while ((zeroCount < length) && (tmp[zeroCount] == 0)) {
         ++zeroCount;
     }
@@ -58,7 +65,7 @@ int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
         return -2; // EXCEPTION_OVERFLOW
     }
     // TODO: os_memmove
-    memcpy(out, (buffer + j), length);
+    os_memcpy(out, (buffer + j), length);
     return length;
 }
 
