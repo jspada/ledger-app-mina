@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import ledgerblue.comm as ledgerblue
 import argparse
@@ -21,6 +21,8 @@ MAX_MEMO_LEN       = 32
 ADDRESS_LEN        = 55
 
 DONGLE = None
+
+__version__ = "1.0.0"
 
 def valid_address(id):
     def f(address):
@@ -45,6 +47,7 @@ def valid_valid_until(valid_until):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', default=False, action="store_true", help='Verbose mode')
+    parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
     subparsers = parser.add_subparsers(dest='operation')
     subparsers.required = True
     get_address_parser = subparsers.add_parser('get-address')

@@ -22,9 +22,11 @@ include $(BOLOS_SDK)/Makefile.defines
 
 APP_LOAD_PARAMS= --path "44'/12586'" --appFlags 0x240 $(COMMON_LOAD_PARAMS)
 
-APPVERSION_M=1
-APPVERSION_N=0
-APPVERSION_P=0
+GIT_DESCRIBE=$(shell git describe --tags --abbrev=8 --always --long --dirty 2>/dev/null)
+VERSION_TAG=$(shell echo $(GIT_DESCRIBE) | sed 's/^v//g')
+APPVERSION_M=$(shell echo "${VERSION_TAG}" | cut -f 1 -d .)
+APPVERSION_N=$(shell echo "${VERSION_TAG}" | cut -f 2 -d .)
+APPVERSION_P=$(shell echo "${VERSION_TAG}" | cut -f 3 -d . | sed 's/^\([0-9]\)[-\.].*/\1/g')
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 APPNAME = "Mina"
 
@@ -136,6 +138,9 @@ SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
 SDK_SOURCE_PATH  += lib_ux
 endif
 
+APP_LOAD_PARAMS_EVALUATED=$(shell printf '\\"%s\\" ' $(APP_LOAD_PARAMS))
+APP_DELETE_PARAMS_EVALUATED=$(shell printf '\\"%s\\" ' $(COMMON_DELETE_PARAMS))
+
 load: all
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
@@ -146,11 +151,34 @@ delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 release: all
-	export APP_LOAD_PARAMS_EVALUATED="$(shell printf '\\"%s\\" ' $(APP_LOAD_PARAMS))"; \
-	cat load-template.sh | envsubst > load.sh
-	chmod +x load.sh
-	tar -zcf mina-ledger-app-$(APPVERSION).tar.gz load.sh bin/app.hex
-	rm load.sh
+	@echo "Packaging release... mina-ledger-app-$(VERSION_TAG).tar.gz"
+	@echo "Contents" > README
+	@echo "    ./install.sh         - Load Mina app onto Ledger device" >> README
+	@echo "    ./uninstall.sh       - Delete Mina app from Ledger device" >> README
+	@echo "    ./mina_ledger_wallet - Mina Ledger command-line wallet" >> README
+	@echo 'if ! which python3 > /dev/null 2>&1 ; then echo "Error: Please install python3"  && exit ; fi' > preamble
+	@echo 'if ! which pip3 > /dev/null 2>&1 ; then echo "Error: Please install pip3"  && exit ; fi' >> preamble
+	@echo 'if ! pip3 -q show ledgerblue ; then echo "Error: please pip3 install ledgerblue" && exit ; fi' >> preamble
+	@echo 'read -p "Please unlock your Ledger device and exit any apps (press any key to continue) " unused' >> preamble
+	@cat preamble > install.sh
+	@echo "python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS_EVALUATED)" >> install.sh
+	@cat preamble > uninstall.sh
+	@echo "python3 -m ledgerblue.deleteApp $(APP_DELETE_PARAMS_EVALUATED)" > uninstall.sh
+	@chmod +x install.sh uninstall.sh
+	@cp utils/mina_ledger_wallet.py mina_ledger_wallet
+	@sed -i 's/__version__ = "1.0.0"/__version__ = "$(VERSION_TAG)"/' mina_ledger_wallet
+	@tar -zcf mina-ledger-app-$(VERSION_TAG).tar.gz \
+	        --transform "s,^,mina-ledger-app-$(VERSION_TAG)/," \
+			README \
+	        install.sh \
+	        uninstall.sh \
+	        mina_ledger_wallet \
+	        bin/app.hex
+	@rm README
+	@rm preamble
+	@rm install.sh
+	@rm uninstall.sh
+	@rm mina_ledger_wallet
 
 unit_tests: tests
 	$(MAKE) --directory=$<
