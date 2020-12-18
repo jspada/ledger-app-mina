@@ -10,7 +10,7 @@ import ctypes
 
 COIN = 1000000000
 
-ROSETTA_SERVER = "http://localhost:3087"
+MINA_URL = "http://localhost:3087"
 NETWORK = "debug"
 VERBOSE = False
 
@@ -49,12 +49,16 @@ if __name__ == "__main__":
     subparsers.required = True
     get_address_parser = subparsers.add_parser('get-address')
     get_address_parser.add_argument('account_number', help='BIP44 account to retrieve. e.g. 42.')
+    get_balance_parser = subparsers.add_parser('get-balance')
+    get_balance_parser.add_argument('address', type=valid_address("Address"), help='Mina address')
+    get_balance_parser.add_argument('--mina_url', help='Mina rosetta interface url (default http://localhost:3087)')
+    get_balance_parser.add_argument('--network', help='Network override')
     send_payment_parser = subparsers.add_parser('send-payment')
     send_payment_parser.add_argument('sender_bip44_account', help='BIP44 account to send from (e.g. 42)')
     send_payment_parser.add_argument('sender_address', type=valid_address("Sender"), help='Mina address of sender')
     send_payment_parser.add_argument('receiver', type=valid_address("Receiver"), help='Mina address of recipient')
     send_payment_parser.add_argument('amount', help='Payment amount you want to send')
-    send_payment_parser.add_argument('--rosetta_server', help='Rosetta server (default http://localhost:3087)')
+    send_payment_parser.add_argument('--mina_url', help='Mina rosetta interface url (default http://localhost:3087)')
     send_payment_parser.add_argument('--network', help='Network override')
     send_payment_parser.add_argument('--fee', help='Fee override')
     send_payment_parser.add_argument('--nonce', help='Nonce override')
@@ -64,7 +68,7 @@ if __name__ == "__main__":
     delegate_payment_parser.add_argument('delegator_bip44_account', help='BIP44 account of delegator (e.g. 42)')
     delegate_payment_parser.add_argument('delegator_address', type=valid_address("Delegator"), help='Address of delegator')
     delegate_payment_parser.add_argument('delegate', type=valid_address("Delegate"), help='Address of delegate')
-    delegate_payment_parser.add_argument('--rosetta_server', help='Rosetta server (default http://localhost:3087)')
+    delegate_payment_parser.add_argument('--mina_url', help='Mina rosetta interface url (default http://localhost:3087)')
     delegate_payment_parser.add_argument('--network', help='Network override')
     delegate_payment_parser.add_argument('--fee', help='Fee override')
     delegate_payment_parser.add_argument('--nonce', help='Nonce override')
@@ -81,7 +85,7 @@ def rosetta_network_request():
 
     # Query
     print("Getting network identifier... ", end="", flush=True)
-    network_resp = requests.post(ROSETTA_SERVER + '/network/list',
+    network_resp = requests.post(MINA_URL + '/network/list',
                                 data=json.dumps(network_request)).json()
 
     # Validate
@@ -124,7 +128,7 @@ def rosetta_metadata_request(sender_address):
     construction_metadata_request["options"]["sender"] = sender_address;
 
     print("Getting account nonce and suggested fee... ", end="", flush=True)
-    metadata_resp = requests.post(ROSETTA_SERVER + '/construction/metadata',
+    metadata_resp = requests.post(MINA_URL + '/construction/metadata',
                                   data=json.dumps(construction_metadata_request)).json()
     if "metadata" not in metadata_resp:
         print("error", flush=True)
@@ -159,7 +163,7 @@ def rosetta_balance_request(address):
     account_balance_request["account_identifier"]["address"] = address
 
     print("Getting account balance... ", end="", flush=True)
-    balance_resp = requests.post(ROSETTA_SERVER + '/account/balance',
+    balance_resp = requests.post(MINA_URL + '/account/balance',
                                 data=json.dumps(account_balance_request)).json()
 
     if "balances" not in balance_resp:
@@ -273,7 +277,7 @@ def rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce):
     construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
 
     print("Constructing unsigned payment transaction... ", end="", flush=True)
-    payloads_resp = requests.post(ROSETTA_SERVER + '/construction/payloads',
+    payloads_resp = requests.post(MINA_URL + '/construction/payloads',
                                   data=json.dumps(construction_payloads_request)).json()
     if "unsigned_transaction" not in payloads_resp:
         print("error", flush=True)
@@ -359,7 +363,7 @@ def rosetta_delegation_payloads_request(delegator, delegate, fee, nonce):
     construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
 
     print("Constructing unsigned delegate transaction... ", end="", flush=True)
-    payloads_resp = requests.post(ROSETTA_SERVER + '/construction/payloads',
+    payloads_resp = requests.post(MINA_URL + '/construction/payloads',
                                   data=json.dumps(construction_payloads_request)).json()
     if "unsigned_transaction" not in payloads_resp:
         print("error", flush=True)
@@ -411,7 +415,7 @@ def rosetta_combine_request(payload, signature, tx_type):
     construction_combine_request["signatures"][0]["hex_bytes"] = signature
 
     print("Constructing signed transaction... ", end="", flush=True)
-    combine_resp = requests.post(ROSETTA_SERVER + '/construction/combine',
+    combine_resp = requests.post(MINA_URL + '/construction/combine',
                                  data=json.dumps(construction_combine_request)).json()
 
     if "signed_transaction" not in combine_resp:
@@ -452,7 +456,7 @@ def rosetta_submit_request(signed_tx):
     construction_submit_request["signed_transaction"] = json.dumps(signed_tx)
 
     print("Sending transaction... ", end="", flush=True)
-    submit_resp = requests.post(ROSETTA_SERVER + '/construction/submit',
+    submit_resp = requests.post(MINA_URL + '/construction/submit',
                                 data=json.dumps(construction_submit_request)).json()
 
     if "transaction_identifier" not in submit_resp:
@@ -480,7 +484,7 @@ def rosetta_parse_request(tx):
     construction_parse_request["transaction"] = json.dumps(tx)
     print(json.dumps(construction_parse_request))
     print("Checking transaction... ", end="", flush=True)
-    parse_resp = requests.post(ROSETTA_SERVER + '/construction/parse',
+    parse_resp = requests.post(MINA_URL + '/construction/parse',
                                 data=json.dumps(construction_parse_request)).json()
 
     if "operations" not in parse_resp:
@@ -579,16 +583,16 @@ def tx_type_from_op(op):
     elif op == "delegate":
         return TX_TYPE_DELEGATION
 
-def common_tx_check(tx, fee, valid_until, nonce, memo):
-    return tx["fee"] == str(fee) and \
-           ((tx["valid_until"] is not None and \
-           tx["valid_until"] == str(valid_until)) or \
-           (tx["valid_until"] is None and valid_until == MAX_VALID_UNTIL)) and \
-           tx["nonce"] == str(nonce) and \
-           ((tx["memo"] is not None and tx["memo"] == memo) or \
-           (tx["memo"] is None and memo == ""))
-
 def check_tx(tx_type, tx, sender, receiver, amount, fee, valid_until, nonce, memo):
+    def common_tx_check(tx, fee, valid_until, nonce, memo):
+        return tx["fee"] == str(fee) and \
+               ((tx["valid_until"] is not None and \
+               tx["valid_until"] == str(valid_until)) or \
+               (tx["valid_until"] is None and valid_until == MAX_VALID_UNTIL)) and \
+               tx["nonce"] == str(nonce) and \
+               ((tx["memo"] is not None and tx["memo"] == memo) or \
+               (tx["memo"] is None and memo == ""))
+
     if tx_type == TX_TYPE_PAYMENT:
         return tx["from"] == sender and \
                tx["to"] == receiver and \
@@ -603,9 +607,9 @@ __all__ = [TX_TYPE_PAYMENT, TX_TYPE_DELEGATION, ledger_init, ledger_get_address,
 
 if __name__ == "__main__":
     try:
-        ledger_init()
-
         if args.operation == 'get-address':
+            ledger_init()
+
             print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(args.account_number, args.account_number))
 
             while True:
@@ -620,7 +624,30 @@ if __name__ == "__main__":
             print("done")
             print('Received address: {}'.format(address))
 
+        elif args.operation == "get-balance":
+            if args.mina_url is not None:
+                # mina url override
+                print("Using rosetta override: {}".format(args.mina_url))
+                MINA_URL = args.mina_url
+
+            # Lookup the network
+            NETWORK = rosetta_network_request()
+
+            if args.network is not None:
+                # mina url override
+                print("Using network override: {}".format(args.network))
+                NETWORK = args.network
+
+            balance = rosetta_balance_request(args.address)
+
+            print()
+            print("Address: {}".format(args.address))
+            print("Balance: {}".format(to_currency(balance)))
+            print()
+
         elif args.operation == "send-payment" or args.operation == "delegate":
+            ledger_init()
+
             # Set common user supplied parameters
             if args.operation == "send-payment":
                 account = args.sender_bip44_account
@@ -642,15 +669,16 @@ if __name__ == "__main__":
                 print("Using valid_until override: {}".format(args.valid_until))
             valid_until = args.valid_until if args.valid_until is not None else ""
 
-            if args.rosetta_server is not None:
-                # Rosetta server override
-                ROSETTA_SERVER = args.rosetta_server
+            if args.mina_url is not None:
+                # mina url override
+                print("Using rosetta override: {}".format(args.mina_url))
+                MINA_URL = args.mina_url
 
             # Lookup the network
             NETWORK = rosetta_network_request()
 
             if args.network is not None:
-                # Rosetta server override
+                # mina url override
                 print("Using network override: {}".format(args.network))
                 NETWORK = args.network
 
