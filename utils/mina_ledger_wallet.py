@@ -613,7 +613,7 @@ if __name__ == "__main__":
         if args.operation == 'get-address':
             ledger_init()
 
-            print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m/0/0)".format(args.account_number, args.account_number))
+            print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0'/0')".format(args.account_number, args.account_number))
 
             while True:
                 answer = str(input("Continue? (y/N) ")).lower().strip()

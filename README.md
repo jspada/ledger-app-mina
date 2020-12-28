@@ -92,7 +92,7 @@ optional arguments:
 
 ```bash
 $ ./utils/mina_ledger_wallet.py get-address 1
-Get address for account 1 (path 44'/12586'/1/0/0)
+Get address for account 1 (path 44'/12586'/1'/0'/0')
 Continue? (y/N) y
 Generating address (please confirm on Ledger device)... done
 Received address: B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P
