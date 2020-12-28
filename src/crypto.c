@@ -1,16 +1,9 @@
-// Mina schnorr signatures and eliptic curve arithmatic
+// Mina schnorr signatures and elliptic curve arithmetic
 //
 //     * Produces a schnorr signature according to the specification here:
 //       https://github.com/MinaProtocol/mina/blob/develop/docs/specs/signatures/description.md
 //
 //     * Signer reference here: https://github.com/MinaProtocol/signer-reference
-//
-//     * Curve arithmatic
-//         - field_add, field_sub, field_mul, field_sq, field_inv, field_negate, field_pow, field_eq
-//         - scalar_add, scalar_sub, scalar_mul, scalar_sq, scalar_pow, scalar_eq
-//         - group_add, group_dbl, group_scalar_mul (group elements use projective coordinates)
-//         - affine_scalar_mul, projective_to_affine
-//         - generate_pubkey, generate_keypair, sign
 //
 //     * Curve details
 //         Pasta.Pallas (https://github.com/zcash/pasta)
@@ -26,7 +19,7 @@
 #include "globals.h"
 #include "random_oracle_input.h"
 
-// base field Fp
+// Base field Fp
 static const Field FIELD_MODULUS = {
     0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -34,7 +27,7 @@ static const Field FIELD_MODULUS = {
     0x99, 0x2d, 0x30, 0xed, 0x00, 0x00, 0x00, 0x01
 };
 
-// scalar field Fq
+// Scalar field Fq
 static const Scalar GROUP_ORDER = {
     0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -50,11 +43,26 @@ static const Field GROUP_COEFF_B = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05
 };
 
+
+static const Field FIELD_ZERO = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
 static const Field FIELD_ONE = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
+};
+
+static const Field FIELD_TWO = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02
 };
 
 static const Field FIELD_THREE = {
@@ -76,13 +84,6 @@ static const Field FIELD_EIGHT = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08
-};
-
-static const Field FIELD_ZERO = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 static const Scalar SCALAR_ZERO = {
@@ -297,8 +298,8 @@ void projective_to_affine(Affine *r, const Group *p)
     field_mul(r->y, p->Y, zi3); // Y/Z^3
 }
 
-// https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
-// cost 2M + 5S + 6add + 3*2 + 1*3 + 1*8
+// https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-1986-cc.op3
+// cost 3M + 3S + 24 + 1*a + 4add + 2*2 + 1*3 + 1*4 + 1*8
 void group_dbl(Group *r, const Group *p)
 {
     if (is_zero(p)) {
@@ -306,30 +307,32 @@ void group_dbl(Group *r, const Group *p)
         return;
     }
 
-    Field a, b, c;
-    field_sq(a, p->X);            // a = X1^2
-    field_sq(b, p->Y);            // b = Y1^2
-    field_sq(c, b);               // c = b^2
+    Field t0, t1, S;
+    field_sq(t0, p->Y);              // t0 = Y1^2
+    field_mul(t1, p->X, t0);         // t1 = X1*t0
+    field_mul(S, FIELD_FOUR, t1);    // S = 4*t1
 
-    Field d, e, f;
-    field_add(r->X, p->X, b);     // t0 = X1 + b
-    field_sq(r->Y, r->X);         // t1 = t0^2
-    field_sub(r->Z, r->Y, a);     // t2 = t1 - a
-    field_sub(r->X, r->Z, c);     // t3 = t2 - c
-    field_add(d, r->X, r->X);     // d = 2 * t3
-    field_mul(e, FIELD_THREE, a); // e = 3 * a
-    field_sq(f, e);               // f = e^2
+    Field t2, t3;
+    field_sq(t2, p->X);              // t2 = X1^2
+                                     // t3 = Z1^4
+                                     // t4 = a*t3 [a = 0]
+    field_mul(t3, FIELD_THREE, t2);  // t3 = 3*t2
 
-    field_add(r->Y, d, d);        // t4 = 2 * d
-    field_sub(r->X, f, r->Y);     // X = f - t4
+    Field t4, t5;
+                                     // M = t3+t4
+    field_sq(t4, t3);                // t4 = M^2
+    field_mul(t5, FIELD_TWO, S);     // t5 = 2*S
+    field_sub(r->X, t4, t5);         // T = t4-t5
+                                     // X3 = T
 
-    field_sub(r->Y, d, r->X);     // t5 = d - X
-    field_mul(f, FIELD_EIGHT, c); // t6 = 8 * c
-    field_mul(r->Z, e, r->Y);     // t7 = e * t5
-    field_sub(r->Y, r->Z, f);     // Y = t7 - t6
-
-    field_mul(f, p->Y, p->Z);     // t8 = Y1 * Z1
-    field_add(r->Z, f, f);        // Z = 2 * t8
+    Field t6, t7, t8, t9, t10;
+    field_sub(t6, S, r->X);          // t6 = S-T
+    field_sq(t7, t0);                // t7 = Y1^4
+    field_mul(t8, FIELD_EIGHT, t7);  // t8 = 8*t7
+    field_mul(t9, t3, t6);           // t9 = M*t6
+    field_sub(r->Y, t9, t8);         // Y3 = t11-t10
+    field_mul(t10, p->Y, p->Z);      // t10 = Y1*Z1
+    field_mul(r->Z, FIELD_TWO, t10); // Z3 = 2*t12
 }
 
 // https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/addition/add-2007-bl.op3
@@ -392,59 +395,7 @@ void group_add(Group *r, const Group *p, const Group *q)
     field_mul(r->Z, j, h);        // ((z1 + z2)^2 - z1z1 - z2z2) * h
 }
 
-// https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/addition/madd-2007-bl.op3
-// for p = (X1, Y1, Z1), q = (X2, Y2, Z2); assumes Z2 = 1
-// cost 7M + 4S + 9add + 3*2 + 1*4 ?
-void group_madd(Group *r, const Group *p, const Group *q)
-{
-    if (is_zero(p)) {
-        *r = *q;
-        return;
-    }
-    if (is_zero(q)) {
-        *r = *p;
-        return;
-    }
-
-    Field z1z1, u2;
-    field_sq(z1z1, p->Z);            // z1z1 = Z1^2
-    field_mul(u2, q->X, z1z1);       // u2 = X2 * z1z1
-
-    Field s2;
-    field_mul(r->X, p->Z, z1z1);     // t0 = Z1 * z1z1
-    field_mul(s2, q->Y, r->X);       // s2 = Y2 * t0
-
-    Field h, hh;
-    field_sub(h, u2, p->X);          // h = u2 - X1
-    field_sq(hh, h);                 // hh = h^2
-
-    Field j, w, v;
-    field_mul(r->X, FIELD_FOUR, hh); // i = 4 * hh
-    field_mul(j, h, r->X);           // j = h * i
-    field_sub(r->Y, s2, p->Y);       // t1 = s2 - Y1
-    field_add(w, r->Y, r->Y);        // w = 2 * t1
-    field_mul(v, p->X, r->X);        // v = X1 * i
-
-    // X3 = w^2 - J - 2*V
-    field_sq(r->X, w);               // t2 = w^2
-    field_add(r->Y, v, v);           // t3 = 2*v
-    field_sub(r->Z, r->X, j);        // t4 = t2 - j
-    field_sub(r->X, r->Z, r->Y);     // X3 = w^2 - j - 2*v = t4 - t3
-
-    // Y3 = w * (V - X3) - 2*Y1*J
-    field_sub(r->Y, v, r->X);        // t5 = v - X3
-    field_mul(v, p->Y, j);           // t6 = Y1 * j
-    field_add(r->Z, v, v);           // t7 = 2 * t6
-    field_mul(s2, w, r->Y);          // t8 = w * t5
-    field_sub(r->Y, s2, r->Z);       // w * (v - X3) - 2*Y1*j = t8 - t7
-
-    // Z3 = (Z1 + H)^2 - Z1Z1 - HH
-    field_add(w, p->Z, h);           // t9 = Z1 + h
-    field_sq(v, w);                  // t10 = t9^2
-    field_sub(w, v, z1z1);           // t11 = t10 - z1z1
-    field_sub(r->Z, w, hh);          // (Z1 + h)^2 - Z1Z1 - hh = t11 - hh
-}
-
+// Montgomery ladder scalar multiplication (this could be optimized further)
 void group_scalar_mul(Group *r, const Scalar k, const Group *p)
 {
     *r = GROUP_ZERO;
@@ -456,15 +407,16 @@ void group_scalar_mul(Group *r, const Scalar k, const Group *p)
     }
 
     Group r1 = *p;
-    for (unsigned int i = SCALAR_OFFSET; i < SCALAR_BITS; i++) {
-        unsigned int di = k[i / 8] & (1 << (7 - (i % 8)));
+    for (size_t i = SCALAR_OFFSET; i < SCALAR_BITS; i++) {
+        uint8_t di = k[i / 8] & (1 << (7 - (i % 8)));
         Group q0;
-        if (di == 0) {
+        if (!di) {
             group_add(&q0, r, &r1); // r1 = r0 + r1
             r1 = q0;
             group_dbl(&q0, r);      // r0 = r0 + r0
             *r = q0;
-        } else {
+        }
+        else {
             group_add(&q0, r, &r1); // r0 = r0 + r1
             *r = q0;
             group_dbl(&q0, &r1);    // r1 = r1 + r1

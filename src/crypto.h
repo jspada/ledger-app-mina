@@ -53,7 +53,6 @@ void field_add(Field c, const Field a, const Field b);
 void field_mul(Field c, const Field a, const Field b);
 void field_sq(Field c, const Field a);
 void field_pow(Field c, const Field a, const Field e);
-void field_pow_orig(Field c, const Field a, const Field e);
 void group_add(Group *c, const Group *a, const Group *b);
 void group_dbl(Group *c, const Group *a);
 void group_scalar_mul(Group *r, const Scalar k, const Group *p);
