@@ -159,7 +159,13 @@ def rosetta_balance_request(address):
         "account_identifier": {
             "address": ""
         },
-        "metadata": {}
+        "currencies": [
+            {
+                "symbol": "CODA",
+                "decimals": 9,
+                "metadata": {}
+            }
+        ]
     }""")
 
     account_balance_request["network_identifier"]["network"] = NETWORK
