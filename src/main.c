@@ -61,7 +61,7 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                                        dataLength, flags, tx);
                     break;
 
-            case INS_SIGN_TX:
+                case INS_SIGN_TX:
                     handle_sign_tx(G_io_apdu_buffer[OFFSET_P1],
                                    G_io_apdu_buffer[OFFSET_P2],
                                    G_io_apdu_buffer + OFFSET_CDATA,
@@ -267,7 +267,7 @@ void app_exit(void) {
     END_TRY_L(exit);
 }
 
-void nv_app_state_init(){
+void nv_app_state_init(void) {
     if (N_storage.initialized != 0x01) {
         internalStorage_t storage;
         storage.initialized = 0x01;

@@ -7,7 +7,7 @@
 static uint32_t _account = 0;
 static char     _address[MINA_ADDRESS_LEN];
 
-static uint8_t set_result_get_address()
+static uint8_t set_result_get_address(void)
 {
     uint8_t tx = 0;
     assert(strlen(_address) == MINA_ADDRESS_LEN - 1);
@@ -16,7 +16,7 @@ static uint8_t set_result_get_address()
     return tx;
 }
 
-static void gen_address()
+static void gen_address(void)
 {
     if (_address[0] == '\0')
     {

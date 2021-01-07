@@ -35,7 +35,7 @@ static struct ui_t {
     char receiver_title[9];
 } _ui;
 
-static uint8_t set_result_get_signature()
+static uint8_t set_result_get_signature(void)
 {
     uint8_t tx = 0;
     os_memmove(G_io_apdu_buffer + tx, _sig_hex, sizeof(_sig_hex));
@@ -43,7 +43,7 @@ static uint8_t set_result_get_signature()
     return tx;
 }
 
-static void sign_transaction()
+static void sign_transaction(void)
 {
     BEGIN_TRY {
         TRY {
