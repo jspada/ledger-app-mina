@@ -151,7 +151,7 @@ delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 release: all
-	@echo "Packaging release... mina-ledger-app-$(VERSION_TAG).tar.gz"
+	@echo "Packaging release... ledger-app-mina-$(VERSION_TAG).tar.gz"
 	@echo "Contents" > README
 	@echo "    ./install.sh         - Load Mina app onto Ledger device" >> README
 	@echo "    ./uninstall.sh       - Delete Mina app from Ledger device" >> README
@@ -167,9 +167,9 @@ release: all
 	@chmod +x install.sh uninstall.sh
 	@cp utils/mina_ledger_wallet.py mina_ledger_wallet
 	@sed -i 's/__version__ = "1.0.0"/__version__ = "$(VERSION_TAG)"/' mina_ledger_wallet
-	@tar -zcf mina-ledger-app-$(VERSION_TAG).tar.gz \
-	        --transform "s,^,mina-ledger-app-$(VERSION_TAG)/," \
-			README \
+	@tar -zcf ledger-app-mina-$(VERSION_TAG).tar.gz \
+	        --transform "s,^,ledger-app-mina-$(VERSION_TAG)/," \
+		README \
 	        install.sh \
 	        uninstall.sh \
 	        mina_ledger_wallet \

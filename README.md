@@ -97,7 +97,7 @@ Continue? (y/N) y
 Generating address (please confirm on Ledger device)... done
 Received address: B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P
 ```
-This generates the keypair corresponding to hardware wallet account 1 (BIP44 account 44'/12586'/1/0/0) and returns the corresponding Mina address.
+This generates the keypair corresponding to hardware wallet account 1 (BIP44 account 44'/12586'/1'/0'/0') and returns the corresponding Mina address.
 
 **Get balance**
 

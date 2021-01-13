@@ -117,7 +117,7 @@ UX_STEP_TIMEOUT(
     ux_display_public_flow,
     {
       &C_icon_processing,
-      "Processing",
+      "Processing...",
     });
 
 UX_FLOW(ux_processing_flow,
