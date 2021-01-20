@@ -1,20 +1,25 @@
 # ledger-app-mina
 
 ## Overview
-This is the Mina app for the Nano S/X hardware wallet.
+This is the Mina app for the Ledger Nano S and Nano X hardware wallet.
 
 ## Building and installing
-To build and install the app on your Ledger Nano S you must set up the Ledger Nano S build environments. Please follow the Getting Started instructions at [here](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html).
+To build and install the app on your Ledger Nano you must set up the Ledger Nano build environments. Please follow the Getting Started instructions at [here](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html).
 
 If you don't want to setup a global environnment, you can also setup one just for this app by sourcing `prepare-devenv.sh` with the right target (`s` or `x`).
 
-install prerequisite and switch to a Nano X dev-env:
-
+Install prerequisite and switch to the Nano dev-env:
 ```bash
+sudo apt install gcc-multilib g++-multilib
 sudo apt install python3-venv python3-dev libudev-dev libusb-1.0-0-dev
 
 # (x or s, depending on your device)
 source prepare-devenv.sh s
+```
+
+Clone the source
+```bash
+git clone --recurse-submodules https://github.com/jspada/ledger-app-mina.git
 ```
 
 Compile and load the app onto the device:
@@ -34,9 +39,20 @@ make delete
 
 ## Unit tests
 
-There are two types of unit tests: those that run as part of the build
-and those that can be run on the Ledger device.  This section describes
-how to set up and run the on-device unit tests.
+There are two types of unit tests: those that run off-device as part of the build
+and those that can be run on the Ledger device.
+
+### Off-device unit tests
+
+The off-device unit tests run automatically as part of the build, some using the Ledger [Speculos](https://github.com/LedgerHQ/speculos) emulator.  Speculos is included as a submodule of the ledger-app-mina repository (see cloning instructions above).
+
+You can skip running the off-device emulator tests by using the `SKIP_EMULATOR_TESTS` environmental variable.
+
+```bash
+SKIP_EMULATOR_TESTS=1 make
+```
+
+### On-device unit tests
 
 1. Initialize your Ledger test hardware with the following secret phrase
 
@@ -87,45 +103,46 @@ optional arguments:
   -h, --help            show this help message and exit
   --verbose             Verbose mode
 ```
+There is additional help available for each subcommand.
 
 **Get address**
 
 ```bash
 $ ./utils/mina_ledger_wallet.py get-address 1
-Get address for account 1 (path 44'/12586'/1'/0'/0')
+Get address for account 1 (path 44'/12586'/1'/0/0)
 Continue? (y/N) y
 Generating address (please confirm on Ledger device)... done
-Received address: B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P
+Received address: B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt
 ```
-This generates the keypair corresponding to hardware wallet account 1 (BIP44 account 44'/12586'/1'/0'/0') and returns the corresponding Mina address.
+This generates the keypair corresponding to hardware wallet account 1 (BIP44 account `44'/12586'/1'/0/0`) and returns the corresponding Mina address.
 
 **Get balance**
 
 ```bash
-$ ./utils/mina_ledger_wallet.py get-balance B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx
+$ ./utils/mina_ledger_wallet.py get-balance B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt
 Getting network identifier... debug
 Getting account balance... done
 
-Address: B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx
+Address: B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt
 Balance: 9792.0
 ```
-This queries the Mina blockchain for the balance of address B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx.
+This queries the Mina blockchain for the balance of address `B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx`.
 
 **Send payment**
 
 ```bash
-$ ./utils/mina_ledger_wallet.py send-payment 1 B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g 2.71821
+$ ./utils/mina_ledger_wallet.py send-payment 1 B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g 2.71821
 ```
 
-This sends a payment of 2.71821 Mina from hardware wallet account 1 (B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P) to recipient B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.
+This sends a payment of 2.71821 Mina from hardware wallet account 1 (`B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt`) to recipient `B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g`.
 
 **Delegate**
 
 ```bash
-$ ./utils/mina_ledger_wallet.py delegate 1 B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g --memo "Delegation is fun!"
+$ ./utils/mina_ledger_wallet.py delegate 1 B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g --memo "Delegation is fun!"
 ```
 
-This delegates the entire balance of hardware wallet account 1 (B62qpaDc8nfu4a7xghkEni8u2rBjx7EH95MFeZAhTgGofopaxFjdS7P) to delegate B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.
+This delegates the entire balance of hardware wallet account 1 (`B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt`) to delegate `B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g`.
 
 ## Documentation
 This follows the specification available in the [`api.asc`](https://github.com/LedgerHQ/ledger-app-boilerplate/blob/master/doc/api.asc).
