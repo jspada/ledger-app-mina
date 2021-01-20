@@ -189,5 +189,9 @@ include $(BOLOS_SDK)/Makefile.rules
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
 
+clean:
+	rm -fr obj bin debug dep $(GLYPH_DESTC) $(GLYPH_DESTH)
+	$(MAKE) --directory=tests clean
+
 listvariants:
 	@echo VARIANTS COIN mina

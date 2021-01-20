@@ -10,3 +10,5 @@ src/glyphs.h
 tests/utils_tests
 tests/random_oracle_input_tests
 utils/__pycache__
+tests/emulator_tests
+tests/emulator_tests.log
