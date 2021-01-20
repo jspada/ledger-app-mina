@@ -32,13 +32,17 @@ APPNAME = "Mina"
 
 DEFINES += $(DEFINES_LIB) $(USER_DEFINES)
 
-
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 	ICONNAME=icons/nanox_app_mina.gif
 else
 	ICONNAME=icons/nanos_app_mina.gif
 endif
 
+ifeq ("$(SKIP_EMULATOR_TESTS)","")
+ifeq (,$(wildcard tests/speculos/CMakeLists.txt))
+$(error Submodules missing: use 'git submodule update --init --recursive' or set SKIP_EMULATOR_TESTS=1.)
+endif
+endif
 
 ################
 # Default rule #
