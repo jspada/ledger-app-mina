@@ -10,7 +10,7 @@
 #define FIELD_BYTES    32
 #define SCALAR_BYTES   32
 #define SCALAR_BITS    256
-#define SCALAR_OFFSET  2   // Scalars have 254 used bits
+#define SCALAR_OFFSET  2     // Scalars have 254 used bits
 
 #define SIGNATURE_LEN    129 // as strings,
 #define MINA_ADDRESS_LEN 56  // includes null-bytes
@@ -61,6 +61,6 @@ void projective_to_affine(Affine *p, const Group *r);
 
 void generate_keypair(Keypair *keypair, uint32_t account);
 void generate_pubkey(Affine *pub_key, const Scalar priv_key);
-int get_address(char *address, size_t len, const Affine *pub_key);
+int get_address(char *address, const size_t len, const Affine *pub_key);
 
 void sign(Signature *sig, const Keypair *kp, const ROInput *input);

@@ -7,6 +7,7 @@ import json
 import requests
 import binascii
 import ctypes
+import string
 
 COIN = 1000000000
 
@@ -16,6 +17,7 @@ VERBOSE = False
 
 TX_TYPE_PAYMENT    = 0x00
 TX_TYPE_DELEGATION = 0x04
+MAX_ACCOUNT_NUM    = ctypes.c_uint32(-1).value
 MAX_VALID_UNTIL    = ctypes.c_uint32(-1).value
 MAX_MEMO_LEN       = 32
 ADDRESS_LEN        = 55
@@ -23,6 +25,15 @@ ADDRESS_LEN        = 55
 DONGLE = None
 
 __version__ = "1.0.0"
+
+def valid_account(num):
+    try:
+        ivalue = int(num)
+        if int(num) < 0 or int(num) > MAX_ACCOUNT_NUM:
+            raise
+    except:
+        raise argparse.ArgumentTypeError("Must be in [0,{}]".format(MAX_ACCOUNT_NUM))
+    return int(num)
 
 def valid_address(id):
     def f(address):
@@ -47,17 +58,18 @@ def valid_valid_until(valid_until):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', default=False, action="store_true", help='Verbose mode')
+    parser.add_argument('--cstruct', default=False, action="store_true", help='Cstruct mode')
     parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
     subparsers = parser.add_subparsers(dest='operation')
     subparsers.required = True
     get_address_parser = subparsers.add_parser('get-address')
-    get_address_parser.add_argument('account_number', help='BIP44 account to retrieve. e.g. 42.')
+    get_address_parser.add_argument('account_number', type=valid_account, help='BIP44 account to retrieve. e.g. 42.')
     get_balance_parser = subparsers.add_parser('get-balance')
     get_balance_parser.add_argument('address', type=valid_address("Address"), help='Mina address')
     get_balance_parser.add_argument('--mina_url', help='Mina rosetta interface url (default http://localhost:3087)')
     get_balance_parser.add_argument('--network', help='Network override')
     send_payment_parser = subparsers.add_parser('send-payment')
-    send_payment_parser.add_argument('sender_bip44_account', help='BIP44 account to send from (e.g. 42)')
+    send_payment_parser.add_argument('sender_bip44_account', type=valid_account, help='BIP44 account to send from (e.g. 42)')
     send_payment_parser.add_argument('sender_address', type=valid_address("Sender"), help='Mina address of sender')
     send_payment_parser.add_argument('receiver', type=valid_address("Receiver"), help='Mina address of recipient')
     send_payment_parser.add_argument('amount', help='Payment amount you want to send')
@@ -68,7 +80,7 @@ if __name__ == "__main__":
     send_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     send_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
     delegate_payment_parser = subparsers.add_parser('delegate')
-    delegate_payment_parser.add_argument('delegator_bip44_account', help='BIP44 account of delegator (e.g. 42)')
+    delegate_payment_parser.add_argument('delegator_bip44_account', type=valid_account, help='BIP44 account of delegator (e.g. 42)')
     delegate_payment_parser.add_argument('delegator_address', type=valid_address("Delegator"), help='Address of delegator')
     delegate_payment_parser.add_argument('delegate', type=valid_address("Delegate"), help='Address of delegate')
     delegate_payment_parser.add_argument('--mina_url', help='Mina rosetta interface url (default http://localhost:3087)')
@@ -574,6 +586,17 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
     apdu = bytearray.fromhex(apduMessage)
     return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
 
+def print_cstruct(str):
+    revbytes = bytes.fromhex(str)[::-1]
+    print("uint8_t bytes[{}] = {{".format(len(revbytes)), end="", flush=True)
+    i = 0
+    for byte in revbytes:
+        if i % 8 == 0:
+            print("\n    ", end="", flush=True)
+        print("0x{:02x}, ".format(byte), end="", flush=True)
+        i += 1
+    print("\n};", flush=True)
+
 def to_currency(amount):
     return float(amount)/COIN
 
@@ -619,7 +642,7 @@ if __name__ == "__main__":
         if args.operation == 'get-address':
             ledger_init()
 
-            print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0'/0')".format(args.account_number, args.account_number))
+            print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(args.account_number, args.account_number))
 
             while True:
                 answer = str(input("Continue? (y/N) ")).lower().strip()
@@ -632,6 +655,9 @@ if __name__ == "__main__":
             address = ledger_get_address(int(args.account_number))
             print("done")
             print('Received address: {}'.format(address))
+
+            if args.cstruct and all(c in string.hexdigits for c in address):
+                print_cstruct(address)
 
         elif args.operation == "get-balance":
             if args.mina_url is not None:
@@ -714,7 +740,7 @@ if __name__ == "__main__":
             print()
             print("Sign transaction:")
             print("    Type:        {}".format(tx_type_name(args.operation)))
-            print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0'/0')".format(account, account))
+            print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
             if args.operation == "send-payment":
                 print("    Sender:      {} (balance {})".format(sender, to_currency(balance)))
@@ -833,7 +859,7 @@ if __name__ == "__main__":
             print()
             print("Send transaction:")
             print("    Type:        {}".format(tx_type_name(args.operation)))
-            print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0'/0')".format(account, account))
+            print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
             if args.operation == "send-payment":
                 print("    Sender:      {} (balance {})".format(signed_tx["from"], to_currency(balance)))
@@ -855,6 +881,10 @@ if __name__ == "__main__":
 
             print("    Signature:   {}...".format(signed_payload["signature"][0:74]))
             print()
+
+            if args.cstruct and all(c in string.hexdigits for c in signature):
+                print_cstruct(signature)
+
             if args.operation == "delegate":
                 print("    The entire balance will be delegated.")
                 print()

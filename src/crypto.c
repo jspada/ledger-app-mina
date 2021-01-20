@@ -43,7 +43,6 @@ static const Field GROUP_COEFF_B = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05
 };
 
-
 static const Field FIELD_ZERO = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -175,9 +174,14 @@ void field_pow(Field c, const Field a, const Field e)
     cx_math_powm(c, a, e, FIELD_BYTES, FIELD_MODULUS, FIELD_BYTES);
 }
 
-unsigned int field_eq(const Field a, const Field b)
+bool field_eq(const Field a, const Field b)
 {
     return (os_memcmp(a, b, FIELD_BYTES) == 0);
+}
+
+bool field_is_odd(const Field y)
+{
+    return y[FIELD_BYTES - 1] & 0x01;
 }
 
 void scalar_copy(Scalar a, const Scalar b)
@@ -219,53 +223,19 @@ void scalar_pow(Scalar c, const Scalar a, const Scalar e)
     cx_math_powm(c, a, e, SCALAR_BYTES, GROUP_ORDER, SCALAR_BYTES);
 }
 
-unsigned int scalar_eq(const Scalar a, const Scalar b)
+bool scalar_eq(const Scalar a, const Scalar b)
 {
     return (os_memcmp(a, b, SCALAR_BYTES) == 0);
 }
 
-// zero is the only point with Z = 0 in jacobian coordinates
-unsigned int is_zero(const Group *p)
+bool scalar_is_zero(const Scalar a)
 {
-    return field_eq(p->Z, FIELD_ZERO);
+    return scalar_eq(a, SCALAR_ZERO);
 }
 
-unsigned int affine_is_zero(const Affine *p)
+bool affine_is_zero(const Affine *p)
 {
     return (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO));
-}
-
-unsigned int is_on_curve(const Group *p)
-{
-    if (is_zero(p)) {
-        return 1;
-    }
-
-    Field lhs, rhs;
-    if (field_eq(p->Z, FIELD_ONE)) {
-        // we can check y^2 == x^3 + ax + b
-        field_sq(lhs, p->Y);                // y^2
-        field_sq(rhs, p->X);                // x^2
-        field_mul(rhs, rhs, p->X);          // x^3
-        field_add(rhs, rhs, GROUP_COEFF_B); // x^3 + b
-    }
-    else {
-        // we check (y/z^3)^2 == (x/z^2)^3 + b
-        // => y^2 == x^3 + bz^6
-        Field x3, z6;
-        field_sq(x3, p->X);                 // x^2
-        field_mul(x3, x3, p->X);            // x^3
-        field_sq(lhs, p->Y);                // y^2
-        field_sq(z6, p->Z);                 // z^2
-        field_sq(z6, z6);                   // z^4
-        field_mul(z6, z6, p->Z);            // z^5
-        field_mul(z6, z6, p->Z);            // z^6
-
-        field_mul(rhs, z6, GROUP_COEFF_B);  // bz^6
-        field_add(rhs, x3, rhs);            // x^3 + bz^6
-    }
-
-    return field_eq(lhs, rhs);
 }
 
 void affine_to_projective(Group *r, const Affine *p)
@@ -298,11 +268,17 @@ void projective_to_affine(Affine *r, const Group *p)
     field_mul(r->y, p->Y, zi3); // Y/Z^3
 }
 
+// zero is the only point with Z = 0 in jacobian coordinates
+bool group_is_zero(const Group *p)
+{
+    return field_eq(p->Z, FIELD_ZERO);
+}
+
 // https://www.hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-1986-cc.op3
 // cost 3M + 3S + 24 + 1*a + 4add + 2*2 + 1*3 + 1*4 + 1*8
 void group_dbl(Group *r, const Group *p)
 {
-    if (is_zero(p)) {
+    if (group_is_zero(p)) {
         *r = *p;
         return;
     }
@@ -339,12 +315,12 @@ void group_dbl(Group *r, const Group *p)
 // cost 10M + 5S + 33 + 6add
 void group_add(Group *r, const Group *p, const Group *q)
 {
-    if (is_zero(p)) {
+    if (group_is_zero(p)) {
         *r = *q;
         return;
     }
 
-    if (is_zero(q)) {
+    if (group_is_zero(q)) {
         *r = *p;
         return;
     }
@@ -387,34 +363,64 @@ void group_add(Group *r, const Group *p, const Group *q)
     field_mul(r->Z, p->Z, t4); // Z3 = Z1*t4
 }
 
-// Montgomery ladder scalar multiplication (this could be optimized further)
-void group_scalar_mul(Group *r, const Scalar k, const Group *p)
+// Double-and-add scalar multiplication
+void group_scalar_mul(Group *q, const Scalar k, const Group *p)
 {
-    *r = GROUP_ZERO;
-    if (is_zero(p)) {
+    *q = GROUP_ZERO;
+    if (group_is_zero(p)) {
         return;
     }
-    if (scalar_eq(k, SCALAR_ZERO)) {
+    if (scalar_is_zero(k)) {
         return;
     }
 
-    Group r1 = *p;
-    for (size_t i = SCALAR_OFFSET; i < SCALAR_BITS; i++) {
-        uint8_t di = k[i / 8] & (1 << (7 - (i % 8)));
-        Group q0;
-        if (!di) {
-            group_add(&q0, r, &r1); // r1 = r0 + r1
-            r1 = q0;
-            group_dbl(&q0, r);      // r0 = r0 + r0
-            *r = q0;
-        }
-        else {
-            group_add(&q0, r, &r1); // r0 = r0 + r1
-            *r = q0;
-            group_dbl(&q0, &r1);    // r1 = r1 + r1
-            r1 = q0;
+    Group t0;
+    for (size_t i = 0; i < SCALAR_BITS; i++) {
+        uint8_t di = (k[i / 8] >> (7 - (i % 8))) & 0x01;
+
+        // q = 2q
+        group_dbl(&t0, q);
+        *q = t0;
+
+        if (di) {
+            // q = q + p
+            group_add(&t0, q, p);
+            *q = t0;
         }
     }
+}
+
+bool group_is_on_curve(const Group *p)
+{
+    if (group_is_zero(p)) {
+        return 1;
+    }
+
+    Field lhs, rhs;
+    if (field_eq(p->Z, FIELD_ONE)) {
+        // we can check y^2 == x^3 + ax + b
+        field_sq(lhs, p->Y);                // y^2
+        field_sq(rhs, p->X);                // x^2
+        field_mul(rhs, rhs, p->X);          // x^3
+        field_add(rhs, rhs, GROUP_COEFF_B); // x^3 + b
+    }
+    else {
+        // we check (y/z^3)^2 == (x/z^2)^3 + b
+        // => y^2 == x^3 + bz^6
+        Field x3, z6;
+        field_sq(x3, p->X);                 // x^2
+        field_mul(x3, x3, p->X);            // x^3
+        field_sq(lhs, p->Y);                // y^2
+        field_sq(z6, p->Z);                 // z^2
+        field_sq(z6, z6);                   // z^4
+        field_mul(z6, z6, p->Z);            // z^5
+        field_mul(z6, z6, p->Z);            // z^6
+
+        field_mul(rhs, z6, GROUP_COEFF_B);  // bz^6
+        field_add(rhs, x3, rhs);            // x^3 + bz^6
+    }
+
+    return field_eq(lhs, rhs);
 }
 
 void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p)
@@ -423,11 +429,6 @@ void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p)
     affine_to_projective(&pp, p);
     group_scalar_mul(&pr, k, &pp);
     projective_to_affine(r, &pr);
-}
-
-inline unsigned int is_odd(const Field y)
-{
-    return y[FIELD_BYTES - 1] & 0x01;
 }
 
 // Ledger uses:
@@ -447,8 +448,8 @@ void generate_keypair(Keypair *keypair, uint32_t account)
         44      | BIP32_HARDENED_OFFSET,
         12586   | BIP32_HARDENED_OFFSET, // 0x312a
         account | BIP32_HARDENED_OFFSET,
-        0       | BIP32_HARDENED_OFFSET,
-        0       | BIP32_HARDENED_OFFSET
+        0,
+        0
     };
 
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path, BIP32_PATH_LEN, keypair->priv, NULL);
@@ -481,7 +482,7 @@ void generate_keypair(Keypair *keypair, uint32_t account)
     return;
 }
 
-int get_address(char *address, size_t len, const Affine *pub_key)
+int get_address(char *address, const size_t len, const Affine *pub_key)
 {
     if (len != MINA_ADDRESS_LEN) {
         THROW(INVALID_PARAMETER);
@@ -501,7 +502,7 @@ int get_address(char *address, size_t len, const Affine *pub_key)
         raw.payload[i + 2] = pub_key->x[sizeof(pub_key->x) - i - 1];
     }
     // y-coordinate parity
-    raw.payload[34] = is_odd(pub_key->y);
+    raw.payload[34] = field_is_odd(pub_key->y);
 
     uint8_t hash1[32];
     cx_hash_sha256((const unsigned char *)&raw, 36, hash1, 32);
@@ -590,7 +591,7 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input)
     affine_scalar_mul(&r, k, &AFFINE_ONE);
     field_copy(sig->rx, r.x);
 
-    if (is_odd(r.y)) {
+    if (field_is_odd(r.y)) {
         // k = -k
         Scalar tmp;
         scalar_copy(tmp, k);
