@@ -1,12 +1,29 @@
-// Poseidon hash function
+// Poseidon - cryptographic hash function for zero-knowledge proof systems
+//
 //     Details: https://eprint.iacr.org/2019/458.pdf
 //
-//     Poseidon is used to hash to a field in the schnorr signature scheme we
-//     use. In order to be efficiently computed within the snark, it is computed
-//     using the base field of the elliptic curve, and the result is then used
-//     as a scalar field element, to scale the elliptic curve point. We do all
-//     of the computation in this file in the base field, but output the result
-//     as a scalar.
+//     Reference implementation:
+//         https://github.com/MinaProtocol/c-reference-signer
+//
+//     Poseidon is used by Mina's Schnorr signature scheme
+//
+//     In order to be efficiently computed within the SNARK, Poseidon
+//     is computed using the base field of the elliptic curve, and the
+//     result is then used as a scalar field element, to scale the
+//     elliptic curve point. We do all computation in the base field,
+//     but output the result as a scalar.
+//
+//     Mina's implementation of Poseidon varies slightly from the
+//     description given in original paper. In order to improve the
+//     efficiency of execution for our SNARK, which uses a PLONK-type
+//     circuit model, it is more efficient for the circuit if all the
+//     Poseidon rounds are identical, rather than having some partial
+//     and some full rounds.  Because circuit cost is the main
+//     bottleneck in our protocol, we have opted to improve that at
+//     the expense of out-of-circuit efficiency.  Additionally, from
+//     discussions with experts on arithmetic sponges, there was some
+//     uncertainty about the security of partial rounds, so it was
+//     more conservative from a security perspective as well.
 
 #include <os.h>
 
