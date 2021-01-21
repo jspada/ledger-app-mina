@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #include "get_address.h"
 #include "utils.h"
 #include "crypto.h"
@@ -10,9 +8,8 @@ static char     _address[MINA_ADDRESS_LEN];
 static uint8_t set_result_get_address(void)
 {
     uint8_t tx = 0;
-    assert(strlen(_address) == MINA_ADDRESS_LEN - 1);
-    os_memmove(G_io_apdu_buffer + tx, _address, MINA_ADDRESS_LEN);
-    tx += MINA_ADDRESS_LEN;
+    os_memmove(G_io_apdu_buffer + tx, _address, sizeof(_address));
+    tx += sizeof(_address);
     return tx;
 }
 
@@ -131,6 +128,10 @@ void handle_get_address(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
 {
     UNUSED(dataLength);
     UNUSED(p2);
+
+    if (dataLength != 12) {
+        THROW(INVALID_PARAMETER);
+    }
 
     _address[0] = '\0';
     _account = read_uint32_be(dataBuffer);

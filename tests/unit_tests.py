@@ -3,20 +3,100 @@
 import argparse
 import sys
 import os
+import time
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../utils/")
 import mina_ledger_wallet as mina
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--kind', help="Kind of tests to run (all, get-address, sign-transaction)",
-                    choices = ["all", "get-address", "sign-transaction"], default="all")
+parser.add_argument('--kind', help="Kind of tests to run (all, fuzz, get-address, sign-transaction)",
+                    choices = ["all", "fuzz", "get-address", "sign-transaction"], default="all")
 args = parser.parse_args()
 
 mina.ledger_init()
 
-print("Running unit tests")
+
+def run_fuzz_tests():
+    # Invalid message1
+    assert(not mina.ledger_send_apdu("a5a501a6"))
+
+    # Invalid message2
+    assert(not mina.ledger_send_apdu("b08fdaeeb08fdaee6e8f58de53c7f54e3b86ef06d646e0c28173ab524cf21297eed41c870346760ecee46558de53c7f5b08fdaee6e8f58de53c7f54e3b86e119a24cf21f06d646e0c28173ab5465b08fdaee6e8f58de53c7f54e3b86e119a24cf21297eed41c8703467652279a3e7ec598ef6f06d646e0c28173ab57f897719eb5db73b16043bc7cc0c94cf21297eed41c870346760ecee465"))
+
+    # Invalid message4
+    assert(not mina.ledger_send_apdu("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+
+    # Invalid message5
+    assert(not mina.ledger_send_apdu("0"))
+
+    # Invalid message6
+    assert(not mina.ledger_send_apdu(""))
+
+    # Invalid command
+    assert(not mina.ledger_send_apdu("01f600000000000c00000000"))
+
+    # Invalid instruction
+    assert(not mina.ledger_send_apdu("e00000000000000c00000000"))
+
+    # Invalid get address (nonhex1)
+    assert(not mina.ledger_send_apdu("e00200000000000d100000000"))
+
+    # Invalid instruction
+    assert(not mina.ledger_send_apdu("e00300000000000c00000000"))
+
+    # Invalid instruction
+    assert(not mina.ledger_send_apdu("e0ff00000000000c00000000"))
+
+    # Invalid get address (nonhex2)
+    assert(not mina.ledger_send_apdu("e00200000000000d10deadbeats"))
+
+    # Invalid get address 4294967296 (account number range)
+    assert(not mina.ledger_send_apdu("e00200000000000e0100000000"))
+
+    # Invalid get address 18446744073709551615 (account number range, message too big)
+    assert(not mina.ledger_send_apdu("e002000000000014ffffffffffffffff"))
+
+    # Invalid get address (message to small)
+    assert(not mina.ledger_send_apdu("e00200000000000e010000"))
+
+    # Valid get address 0
+    assert(mina.ledger_send_apdu("e00200000000000c00000000"))
+
+    # Valid get address 0 (ignored P1 and P2)
+    assert(mina.ledger_send_apdu("e002a5a50000000c00000000"))
+
+    # Valid get address 0 (ignored P1)
+    assert(mina.ledger_send_apdu("e002ff000000000c00000000"))
+
+    # Valid get address 0 (ignored P2)
+    assert(mina.ledger_send_apdu("e00200110000000c00000000"))
+
+    # Valid get max address 4294967295
+    assert(mina.ledger_send_apdu("e00200000000000cffffffff"))
+
+    # Invalid sign tx (sender address does not match account number)
+    assert(not mina.ledger_send_apdu("e00300000000015a000000004236327172476158683977656b6677614132797a55626862764659796e6b6d426b68594c56333664767935416b52766765516e593676784236327170614463386e66753461377867686b456e6938753272426a7837454839354d46655a41685467476f666f706178466a6453375000000192906e4a00000000007735940000000010000425d448656c6c6f204d696e612100000000000000000000000000000000000000000000"))
+
+    # Invalid sign tx (message too big)
+    assert(not mina.ledger_send_apdu("e00300000000015a000000004236327172476158683977656b6677614132797a55626862764659796e6b6d426b68594c56333664767935416b52766765516e593676784236327170614463386e66753461377867686b456e6938753272426a7837454839354d46655a41685467476f666f706178466a6453375000000192906e4a00000000007735940000000010000425d448656c6c6f204d696e6121000000000000000000000000000000000000000000001"))
+
+    # Invalid sign tx (message too big)
+    assert(not mina.ledger_send_apdu("e00300000000015a000000004236327172476158683977656b6677614132797a55626862764659796e6b6d426b68594c56333664767935416b52766765516e593676784236327170614463386e66753461377867686b456e6938753272426a7837454839354d46655a41685467476f666f706178466a6453375000000192906e4a00000000007735940000000010000425d448600000e00300000000015a000000004236327172476158683977656b6677614132797a55626862764659796e6b6d426b68594c56333664767935416b52766765516e593676784236327170614463386e66753461377867686b456e6938753272426a7837454839354d46655a41685467476f666f706178466a6453375000000192906e4a00000000007735940000000010000425d448656c6c6f204d696e6121000000000000000000000000000000000000000007454839354d46655a411"))
+
+    # Invalid sign tx (message too small)
+    assert(not mina.ledger_send_apdu("e00300000000015a000000004236327172476158683977656b6677614132797a55626862764659796e6b6d426b68594c56333664767935416b52766765516e593676784236327170614463386e66753461377867686b456e6938753272426a7837454839354d46655a41685467476f666f706178466a6453375000000192906e4a00000000007735940000000010000425d448656c6c6f204d696e6121000000000000000000000000000000000000000000"))
+
+    # Invalid sign tx (invalid tx type)
+    assert(not mina.ledger_send_apdu("e00300000000015a00000000423632716e7a62586d524e6f397133326e34534e75326d70423865374659594c48384e6d6158366f464342596a6a513853624437757a56423632716963697059787945487537516a557153375176426970547335437a676b595a5a5a6b506f4b5659427536746e44556345395a7400000192906e4a00000000007735940000000010000425d448656c6c6f204d696e612100000000000000000000000000000000000000000003"))
 
 def run_get_address_tests():
+    t0 = time.time()
+
+    # These tests were automatically generated from the Mina c-reference-signer
+    #
+    #     Details: https://github.com/MinaProtocol/c-reference-signer/README.markdown
+    #     Command: ./unit_tests ledger_gen
+
     # account 0
     # private key 164244176fddb5d769b7de2027469d027ad428fadcc0c02396e6280142efb718
     assert(mina.ledger_get_address(0) == "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV")
@@ -41,7 +121,18 @@ def run_get_address_tests():
     # private key 3414fc16e86e6ac272fda03cf8dcb4d7d47af91b4b726494dab43bf773ce1779
     assert(mina.ledger_get_address(0x312a) == "B62qoG5Yk4iVxpyczUrBNpwtx2xunhL48dydN53A2VjoRwF8NUTbVr4")
 
+    # Performance report
+    duration = time.time() - t0
+    print("Performed 6 get-address operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/6.0))
+
 def run_signature_tests():
+    t0 = time.time()
+
+    # These tests were automatically generated from the Mina c-reference-signer
+    #
+    #     Details: https://github.com/MinaProtocol/c-reference-signer/README.markdown
+    #     Command: ./unit_tests ledger_gen
+
     # account 0
     # private key 164244176fddb5d769b7de2027469d027ad428fadcc0c02396e6280142efb718
     # sig=0a68fc40b470abedd14cd8b830effa4fa6225e76cbc67fa46dfb0f825c0d1a7d1a8685817e449150070456b5628eeb9af954040e023d3a1b4211c818d210ee56
@@ -146,10 +237,19 @@ def run_signature_tests():
                                577216,
                                "") == "08a668739ec0bd4149e51a85ea9f05887232f91accb884c312dbca8ef7de0c9b341178cfb969c69bb9fc87df110276880cf09bcdf6b899ea3d1d1b4aa59e7c33")
 
+    # Performance report
+    duration = time.time() - t0
+    print("Performed 8 sign-tx operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/8.0))
+
+print("Running unit tests...")
+
 try:
     if args.kind == "all":
+        run_fuzz_tests()
         run_get_address_tests()
         run_signature_tests()
+    elif args.kind == "fuzz":
+        run_fuzz_tests()
     elif args.kind == "get-address":
         run_get_address_tests()
     elif args.kind == "sign-transaction":
@@ -160,4 +260,4 @@ except Exception as ex:
     print("{}".format(ex))
     sys.exit(233)
 
-print("Unit tests completed successfully")
+print("Completed unit tests successfully!")

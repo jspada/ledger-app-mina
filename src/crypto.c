@@ -225,31 +225,12 @@ void scalar_pow(Scalar c, const Scalar a, const Scalar e)
 
 bool scalar_eq(const Scalar a, const Scalar b)
 {
-    return (os_memcmp(a, b, SCALAR_BYTES) == 0);
+    return os_memcmp(a, b, SCALAR_BYTES) == 0;
 }
 
 bool scalar_is_zero(const Scalar a)
 {
     return scalar_eq(a, SCALAR_ZERO);
-}
-
-bool affine_is_zero(const Affine *p)
-{
-    return (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO));
-}
-
-void affine_to_projective(Group *r, const Affine *p)
-{
-    if (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO)) {
-        os_memcpy(r->X, FIELD_ZERO, FIELD_BYTES);
-        os_memcpy(r->Y, FIELD_ONE, FIELD_BYTES);
-        os_memcpy(r->Z, FIELD_ZERO, FIELD_BYTES);
-        return;
-    }
-
-    os_memcpy(r->X, p->x, FIELD_BYTES);
-    os_memcpy(r->Y, p->y, FIELD_BYTES);
-    os_memcpy(r->Z, FIELD_ONE, FIELD_BYTES);
 }
 
 void projective_to_affine(Affine *r, const Group *p)
@@ -375,7 +356,7 @@ void group_scalar_mul(Group *q, const Scalar k, const Group *p)
     }
 
     Group t0;
-    for (size_t i = 0; i < SCALAR_BITS; i++) {
+    for (size_t i = SCALAR_OFFSET; i < SCALAR_BITS; i++) {
         uint8_t di = (k[i / 8] >> (7 - (i % 8))) & 0x01;
 
         // q = 2q
@@ -393,7 +374,7 @@ void group_scalar_mul(Group *q, const Scalar k, const Group *p)
 bool group_is_on_curve(const Group *p)
 {
     if (group_is_zero(p)) {
-        return 1;
+        return true;
     }
 
     Field lhs, rhs;
@@ -421,6 +402,25 @@ bool group_is_on_curve(const Group *p)
     }
 
     return field_eq(lhs, rhs);
+}
+
+bool affine_is_zero(const Affine *p)
+{
+    return field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO);
+}
+
+void affine_to_projective(Group *r, const Affine *p)
+{
+    if (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO)) {
+        os_memcpy(r->X, FIELD_ZERO, FIELD_BYTES);
+        os_memcpy(r->Y, FIELD_ONE, FIELD_BYTES);
+        os_memcpy(r->Z, FIELD_ZERO, FIELD_BYTES);
+        return;
+    }
+
+    os_memcpy(r->X, p->x, FIELD_BYTES);
+    os_memcpy(r->Y, p->y, FIELD_BYTES);
+    os_memcpy(r->Z, FIELD_ONE, FIELD_BYTES);
 }
 
 void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p)
@@ -583,7 +583,7 @@ void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *
 void sign(Signature *sig, const Keypair *kp, const ROInput *input)
 {
     // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
-    Scalar k = { };
+    Scalar k;
     message_derive(k, kp, input);
 
     // r = k*g

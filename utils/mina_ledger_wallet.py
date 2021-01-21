@@ -18,7 +18,9 @@ VERBOSE = False
 TX_TYPE_PAYMENT    = 0x00
 TX_TYPE_DELEGATION = 0x04
 MAX_ACCOUNT_NUM    = ctypes.c_uint32(-1).value
+MAX_AMOUNT         = ctypes.c_uint64(-1).value
 MAX_VALID_UNTIL    = ctypes.c_uint32(-1).value
+MAX_NONCE          = ctypes.c_uint32(-1).value
 MAX_MEMO_LEN       = 32
 ADDRESS_LEN        = 55
 
@@ -28,12 +30,30 @@ __version__ = "1.0.0"
 
 def valid_account(num):
     try:
-        ivalue = int(num)
-        if int(num) < 0 or int(num) > MAX_ACCOUNT_NUM:
+        value = int(num)
+        if value < 0 or value > MAX_ACCOUNT_NUM:
             raise
     except:
         raise argparse.ArgumentTypeError("Must be in [0,{}]".format(MAX_ACCOUNT_NUM))
-    return int(num)
+    return value
+
+def valid_amount(amount):
+    try:
+        value = int(amount)
+        if value < 0 or value > MAX_AMOUNT:
+            raise
+    except:
+        raise argparse.ArgumentTypeError("Must be in [0,{}]".format(MAX_AMOUNT))
+    return value
+
+def valid_nonce(nonce):
+    try:
+        value = int(nonce)
+        if value < 0 or value > MAX_NONCE:
+            raise
+    except:
+        raise argparse.ArgumentTypeError("Must be in [0,{}]".format(MAX_NONCE))
+    return value
 
 def valid_address(id):
     def f(address):
@@ -45,15 +65,17 @@ def valid_address(id):
 
 def valid_memo(memo):
     if memo is None or len(memo) > MAX_MEMO_LEN:
-        raise argparse.ArgumentTypeError("Memo length must be at most {}".format(MAX_MEMO_LEN))
+        raise argparse.ArgumentTypeError("Length must be at most {}".format(MAX_MEMO_LEN))
     else:
         return memo
 
 def valid_valid_until(valid_until):
-    if valid_until is None or int(valid_until) > MAX_VALID_UNTIL:
-        raise argparse.ArgumentTypeError("Valid until must be at most {}".format(MAX_VALID_UNTIL))
-    else:
-        return int(valid_until)
+    try:
+        value = int(valid_until)
+        if value is None or value > MAX_VALID_UNTIL:
+            raise argparse.ArgumentTypeError("Must be at most {}".format(MAX_VALID_UNTIL))
+    except:
+        return value
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -72,11 +94,11 @@ if __name__ == "__main__":
     send_payment_parser.add_argument('sender_bip44_account', type=valid_account, help='BIP44 account to send from (e.g. 42)')
     send_payment_parser.add_argument('sender_address', type=valid_address("Sender"), help='Mina address of sender')
     send_payment_parser.add_argument('receiver', type=valid_address("Receiver"), help='Mina address of recipient')
-    send_payment_parser.add_argument('amount', help='Payment amount you want to send')
+    send_payment_parser.add_argument('amount', type=valid_amount, help='Payment amount you want to send')
     send_payment_parser.add_argument('--mina_url', help='Mina rosetta interface url (default http://localhost:3087)')
     send_payment_parser.add_argument('--network', help='Network override')
-    send_payment_parser.add_argument('--fee', help='Fee override')
-    send_payment_parser.add_argument('--nonce', help='Nonce override')
+    send_payment_parser.add_argument('--fee', type=valid_amount, help='Fee override')
+    send_payment_parser.add_argument('--nonce', type=valid_nonce, help='Nonce override')
     send_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     send_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
     delegate_payment_parser = subparsers.add_parser('delegate')
@@ -530,6 +552,17 @@ def ledger_init():
     except Exception as ex:
         print("Error: {}".format(ex))
         sys.exit(233)
+
+def ledger_send_apdu(apdu_hex):
+    try:
+        if not len(apdu_hex):
+            return
+
+        apdu = bytearray.fromhex(apdu_hex)
+        DONGLE.exchange(apdu)
+        return True
+    except:
+        return False
 
 def ledger_get_address(account):
     # Create APDU message.

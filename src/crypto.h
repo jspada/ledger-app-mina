@@ -10,7 +10,7 @@
 #define FIELD_BYTES    32
 #define SCALAR_BYTES   32
 #define SCALAR_BITS    256
-#define SCALAR_OFFSET  2     // Scalars have 254 used bits
+#define SCALAR_OFFSET  2     // Scalars only use 254 bits
 
 #define SIGNATURE_LEN    129 // as strings,
 #define MINA_ADDRESS_LEN 56  // includes null-bytes
