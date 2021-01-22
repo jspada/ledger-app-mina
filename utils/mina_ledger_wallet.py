@@ -757,9 +757,9 @@ if __name__ == "__main__":
             if args.fee is not None:
                 print("Using fee override: {}".format(args.fee))
                 fee = from_currency(args.fee)
-                if args.nonce is not None:
-                    print("Using nonce override: {}".format(args.nonce))
-                    nonce = int(args.nonce)
+            if args.nonce is not None:
+                print("Using nonce override: {}".format(args.nonce))
+                nonce = int(args.nonce)
 
             balance = rosetta_balance_request(sender)
 
