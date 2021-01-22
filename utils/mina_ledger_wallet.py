@@ -111,6 +111,8 @@ if __name__ == "__main__":
     delegate_payment_parser.add_argument('--nonce', help='Nonce override')
     delegate_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     delegate_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
+    validate_payment_parser = subparsers.add_parser('validate')
+    validate_payment_parser.add_argument('delegator_bip44_account', type=valid_account, help='BIP44 account of delegator (e.g. 42)')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -637,13 +639,13 @@ def from_currency(amount):
     return int(float(amount)*COIN)
 
 def tx_type_name(op):
-    if op == "send-payment":
+    if op == "send-payment" or op == "validate":
         return "Payment"
     elif op == "delegate":
         return "Delegation"
 
 def tx_type_from_op(op):
-    if op == "send-payment":
+    if op == "send-payment" or op == "validate":
         return TX_TYPE_PAYMENT
     elif op == "delegate":
         return TX_TYPE_DELEGATION
@@ -713,7 +715,7 @@ if __name__ == "__main__":
             print("Balance: {}".format(to_currency(balance)))
             print()
 
-        elif args.operation == "send-payment" or args.operation == "delegate":
+        elif args.operation == "send-payment" or args.operation == "delegate" or args.operation == "validate":
             ledger_init()
 
             # Set common user supplied parameters
@@ -722,10 +724,15 @@ if __name__ == "__main__":
                 sender = args.sender_address
                 receiver = args.receiver
                 amount = from_currency(args.amount)
-            else:
+            elif args.operation == "delegate":
                 account = args.delegator_bip44_account
                 sender = args.delegator_address
                 receiver = args.delegate
+                amount = 0
+            elif args.operation == "validate":
+                account = args.delegator_bip44_account
+                sender = args.delegator_address
+                receiver = args.delegator_address
                 amount = 0
 
             # Set optional memo
@@ -761,9 +768,13 @@ if __name__ == "__main__":
                 print("Using nonce override: {}".format(args.nonce))
                 nonce = int(args.nonce)
 
+            if args.operation == "validate":
+                # Ensure that this transaction is never sent by providing an insufficient fee
+                fee = 0
+
             balance = rosetta_balance_request(sender)
 
-            if amount + fee > balance:
+            if amount + fee > balance and args.operation != "validate":
                 if args.operation == "send-payment":
                     print("Total amount {} exceeds account balance {}".format(to_currency(amount + fee), to_currency(balance)))
                 else:
@@ -775,7 +786,7 @@ if __name__ == "__main__":
             print("    Type:        {}".format(tx_type_name(args.operation)))
             print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
-            if args.operation == "send-payment":
+            if args.operation == "send-payment" or args.operation == "validate":
                 print("    Sender:      {} (balance {})".format(sender, to_currency(balance)))
                 print("    Receiver:    {}".format(receiver))
                 print("    Amount:      {:.9f}".format(to_currency(amount)))
@@ -784,7 +795,7 @@ if __name__ == "__main__":
                 print("    Delegate:    {}".format(receiver))
 
             print("    Fee:         {:.9f}".format(to_currency(fee)))
-            if args.operation == "send-payment":
+            if args.operation == "send-payment" or args.operation == "validate":
                 print("    Total:       {:.9f}".format(to_currency(amount + fee)))
             print("    Nonce:       {}".format(nonce))
 
@@ -872,8 +883,10 @@ if __name__ == "__main__":
             if VERBOSE:
                 print("\nSIGNED_TX   = {}\n".format(json.dumps(signed_payload)))
 
-            # # Rosetta parse
-            # rosetta_parse_request(signed_tx)
+            # Rosetta parse
+            if args.operation == "validate":
+                rosetta_parse_request(signed_tx)
+                sys.exit(0)
 
             # Security check rosetta output 2
             if not check_tx(tx_type_from_op(args.operation),
