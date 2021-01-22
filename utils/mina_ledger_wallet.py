@@ -112,7 +112,8 @@ if __name__ == "__main__":
     delegate_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     delegate_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
     validate_payment_parser = subparsers.add_parser('validate')
-    validate_payment_parser.add_argument('delegator_bip44_account', type=valid_account, help='BIP44 account of delegator (e.g. 42)')
+    validate_payment_parser.add_argument('validate_bip44_account', type=valid_account, help='BIP44 account to validate (e.g. 42)')
+    validate_payment_parser.add_argument('validate_address', type=valid_address("Validation"), help='Address to validate')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -731,8 +732,8 @@ if __name__ == "__main__":
                 amount = 0
             elif args.operation == "validate":
                 account = args.delegator_bip44_account
-                sender = args.delegator_address
-                receiver = args.delegator_address
+                sender = args.validate_address
+                receiver = args.validate_address
                 amount = 0
 
             # Set optional memo
