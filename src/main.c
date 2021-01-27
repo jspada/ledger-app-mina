@@ -18,23 +18,27 @@
 #include "utils.h"
 #include "get_address.h"
 #include "sign_tx.h"
+#include "test_crypto.h"
 #include "menu.h"
 
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
-#define CLA 0xE0
-#define INS_GET_CONF 0x01
-#define INS_GET_ADDR 0x02
-#define INS_SIGN_TX  0x03
+#define CLA             0xe0
+#define INS_GET_CONF    0x01
+#define INS_GET_ADDR    0x02
+#define INS_SIGN_TX     0x03
+#define INS_TEST_CRYPTO 0x04
 
+#define APDU_HEADER_LEN 5U
 #define OFFSET_CLA 0
 #define OFFSET_INS 1
 #define OFFSET_P1 2
 #define OFFSET_P2 3
 #define OFFSET_LC 4
-#define OFFSET_CDATA 8
+#define OFFSET_CDATA 5
 
-void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
+void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx,
+                volatile unsigned int length) {
     unsigned short sw = 0;
 
     BEGIN_TRY {
@@ -43,9 +47,14 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                 THROW(0x6E00);
             }
 
-            uint32_t dataLength = read_uint32_be(G_io_apdu_buffer + OFFSET_LC);
-            switch (G_io_apdu_buffer[OFFSET_INS]) {
+            // Check user supplied command data length against the actual
+            // length to make sure it's not a lie!
+            uint8_t dataLength = G_io_apdu_buffer[OFFSET_LC];
+            if (dataLength + APDU_HEADER_LEN != length) {
+                THROW(0x6E00);
+            }
 
+            switch (G_io_apdu_buffer[OFFSET_INS]) {
                 case INS_GET_CONF:
                     G_io_apdu_buffer[0] = LEDGER_MAJOR_VERSION;
                     G_io_apdu_buffer[1] = LEDGER_MINOR_VERSION;
@@ -68,6 +77,13 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
                                    dataLength, flags, tx);
                     break;
 
+                case INS_TEST_CRYPTO:
+                    handle_test_crypto(G_io_apdu_buffer[OFFSET_P1],
+                                       G_io_apdu_buffer[OFFSET_P2],
+                                       G_io_apdu_buffer + OFFSET_CDATA,
+                                       dataLength, flags, tx);
+                    break;
+
                 default:
                     THROW(0x6D00);
                     break;
@@ -88,6 +104,9 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx) {
             default:
                 // Internal error
                 sw = 0x6800 | (e & 0x7FF);
+                if (sw == 0x6802) {
+                    ui_idle();
+                }
                 break;
             }
             // Unexpected exception => report
@@ -128,10 +147,13 @@ void app_main(void) {
                 if (rx == 0) {
                     THROW(0x6982);
                 }
+                else if (rx > 260) {
+                    THROW(0x6E00);
+                }
 
                 PRINTF("New APDU received:\n%.*H\n", rx, G_io_apdu_buffer);
 
-                handleApdu(&flags, &tx);
+                handleApdu(&flags, &tx, rx);
             }
             CATCH(EXCEPTION_IO_RESET) {
               THROW(EXCEPTION_IO_RESET);

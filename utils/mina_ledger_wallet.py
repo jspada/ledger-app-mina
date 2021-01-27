@@ -554,15 +554,15 @@ def ledger_init():
         sys.exit(233)
 
 def ledger_send_apdu(apdu_hex):
-    try:
-        if not len(apdu_hex):
-            return
+    if not len(apdu_hex):
+        return
 
-        apdu = bytearray.fromhex(apdu_hex)
-        DONGLE.exchange(apdu)
-        return True
-    except:
-        return False
+    apdu = bytearray.fromhex(apdu_hex)
+    DONGLE.exchange(apdu)
+    return True
+
+def ledger_crypto_tests():
+    return ledger_send_apdu("e004000000")
 
 def ledger_get_address(account):
     # Create APDU message.
@@ -571,8 +571,11 @@ def ledger_get_address(account):
     # P1  0x00 UNUSED
     # P2  0x00 UNUSED
     account = '{:08x}'.format(account)
-    apduMessage = 'e0020000' + '{:08x}'.format(len(account) + 4) + account
+    apduMessage = 'e0020000' + '{:02x}'.format(int(len(account)/2)) + account
     apdu = bytearray.fromhex(apduMessage)
+
+    if VERBOSE:
+        print("\napduMessage hex ({}) = {}\n".format(total_len + 4, apduMessage))
 
     return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
 
@@ -602,7 +605,7 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
     #     INS 0x03 INS_SIGN_TX
     #     P1  0x00 UNUSED
     #     P2  0x00 UNUSED
-    apduMessage = 'e0030000' + '{:08x}'.format(total_len + 4) \
+    apduMessage = 'e0030000' + '{:02x}'.format(int(total_len/2)) \
                   + sender_bip44_account \
                   + sender_address \
                   + receiver \

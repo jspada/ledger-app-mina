@@ -26,6 +26,7 @@
 //     more conservative from a security perspective as well.
 
 #include <os.h>
+#include <string.h>
 
 #include "crypto.h"
 #include "poseidon.h"
@@ -1389,7 +1390,7 @@ static const Field FIELD_FIVE = {
 void matrix_mul(State s1, const State m[SPONGE_SIZE])
 {
     State s2;
-    os_memset(s2, 0, sizeof(s2));
+    explicit_bzero(s2, sizeof(s2));
 
     for (size_t row = 0; row < SPONGE_SIZE; row++) {
         // Inner product

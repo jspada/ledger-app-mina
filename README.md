@@ -37,6 +37,26 @@ Remove the app from the device:
 make delete
 ```
 
+Run the app with the emulator:
+```bash
+make run
+```
+
+To engage the emulator use the `LEDGER_PROXY_ADDRESS` and `LEDGER_PROXY_PORT` environmental variables.
+
+For example
+
+```bash
+LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PORT=9999 ./utils/mina_ledger_wallet get-address 0
+```
+
+You can also run the app with emulator automation that will automatically approve each operation.  This is done by setting the `AUTOMATION` environmental variable and can be useful when testing.
+
+Run the app with the emulator and automation:
+```bash
+AUTOMATION=1 make run
+```
+
 ## Unit tests
 
 There are two types of unit tests: those that run off-device as part of the build
@@ -46,10 +66,10 @@ and those that can be run on the Ledger device.
 
 The off-device unit tests run automatically as part of the build, some using the Ledger [Speculos](https://github.com/LedgerHQ/speculos) emulator.  Speculos is included as a submodule of the ledger-app-mina repository (see cloning instructions above).
 
-You can skip running the off-device emulator tests by using the `SKIP_EMULATOR_TESTS` environmental variable.
+You can skip running the off-device emulator tests by using the `NO_EMULATOR` environmental variable.
 
 ```bash
-SKIP_EMULATOR_TESTS=1 make
+NO_EMULATOR=1 make
 ```
 
 ### On-device unit tests
@@ -64,7 +84,7 @@ course grief vintage slim tell hospital car maze model style elegant kitchen sta
 
 ```bash
 make clean
-make USER_DEFINES=UNIT_TESTS load
+make USER_DEFINES=ON_DEVICE_UNIT_TESTS load
 ```
 
 3. Start the unit tests app on your Ledger device

@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef LEDGER_BUILD
+    #include <os.h>
+#endif
+
 #define BIP32_PATH_LEN 5
 #define BIP32_HARDENED_OFFSET 0x80000000
 
@@ -48,19 +52,28 @@ typedef struct keypair {
 
 typedef struct roinput ROInput; // Forward declaration
 
-void field_copy(Field a, const Field b);
+void field_copy(Field b, const Field a);
 void field_add(Field c, const Field a, const Field b);
 void field_mul(Field c, const Field a, const Field b);
-void field_sq(Field c, const Field a);
+void field_sq(Field b, const Field a);
 void field_pow(Field c, const Field a, const Field e);
-void group_add(Group *c, const Group *a, const Group *b);
-void group_dbl(Group *c, const Group *a);
-void group_scalar_mul(Group *r, const Scalar k, const Group *p);
-void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p);
-void projective_to_affine(Affine *p, const Group *r);
+
+void scalar_from_bytes(Scalar a, const uint8_t *bytes, size_t len);
+void scalar_copy(Scalar b, const Scalar a);
+bool scalar_eq(const Scalar a, const Scalar b);
+void scalar_add(Scalar c, const Scalar a, const Scalar b);
+void scalar_mul(Scalar c, const Scalar a, const Scalar b);
+void scalar_negate(Field b, const Field a);
+
+void affine_add(Affine *r, const Affine *p, const Affine *q);
+void affine_scalar_mul(Affine *q, const Scalar k, const Affine *p);
+void affine_negate(Affine *q, const Affine *p);
+bool affine_eq(const Affine *p, const Affine *q);
+bool affine_is_on_curve(const Affine *p);
 
 void generate_keypair(Keypair *keypair, uint32_t account);
 void generate_pubkey(Affine *pub_key, const Scalar priv_key);
-int get_address(char *address, const size_t len, const Affine *pub_key);
+bool generate_address(char *address, const size_t len, const Affine *pub_key);
+bool validate_address(const char *address);
 
 void sign(Signature *sig, const Keypair *kp, const ROInput *input);

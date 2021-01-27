@@ -15,38 +15,28 @@ static uint8_t set_result_get_address(void)
 
 static void gen_address(void)
 {
-    if (_address[0] == '\0')
-    {
+    if (_address[0] == '\0') {
         BEGIN_TRY {
             Keypair kp;
             TRY {
                 generate_keypair(&kp, _account);
-
-                int result = get_address(_address, sizeof(_address), &kp.pub);
-                switch (result) {
-                    case -2:
-                        THROW(EXCEPTION_OVERFLOW);
-
-                    case -1:
-                        THROW(INVALID_PARAMETER);
-
-                    default:
-                        ; // SUCCESS
+                if (!generate_address(_address, sizeof(_address), &kp.pub)) {
+                    THROW(INVALID_PARAMETER);
                 }
 
-                #ifdef UNIT_TESTS
+                #ifdef ON_DEVICE_UNIT_TESTS
                 sendResponse(set_result_get_address(), true);
                 #endif
             }
             FINALLY {
-                os_memset(kp.priv, 0, sizeof(kp.priv));
+                explicit_bzero(kp.priv, sizeof(kp.priv));
             }
             END_TRY;
         }
     }
 }
 
-#ifdef UNIT_TESTS
+#ifdef ON_DEVICE_UNIT_TESTS
 
 UX_STEP_NOCB_INIT(
     ux_unit_tests_address_flow_4_step,
@@ -123,13 +113,13 @@ UX_FLOW(ux_processing_flow,
 #endif
 
 void handle_get_address(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
-                        uint32_t dataLength, volatile unsigned int *flags,
+                        uint8_t dataLength, volatile unsigned int *flags,
                         volatile unsigned int *tx)
 {
-    UNUSED(dataLength);
+    UNUSED(p1);
     UNUSED(p2);
 
-    if (dataLength != 12) {
+    if (dataLength != 4) {
         THROW(INVALID_PARAMETER);
     }
 

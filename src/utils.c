@@ -8,7 +8,6 @@
 #ifdef LEDGER_BUILD
     #include <os.h>
 #else
-    #define os_memset memset
     #define os_memcpy memcpy
 #endif
 
@@ -31,9 +30,9 @@ int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
     unsigned char startAt;
     unsigned char zeroCount = 0;
     if (length > sizeof(tmp)) {
-        return -1; // INVALID_PARAMETER
+        // Input buffer too big
+        return -1;
     }
-    // TODO: os_memmove
     os_memcpy(tmp, in, length);
     while ((zeroCount < length) && (tmp[zeroCount] == 0)) {
         ++zeroCount;
@@ -62,9 +61,9 @@ int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
     }
     length = 2 * length - j;
     if (maxoutlen < length) {
-        return -2; // EXCEPTION_OVERFLOW
+        // Output buffer too small
+        return -1;
     }
-    // TODO: os_memmove
     os_memcpy(out, (buffer + j), length);
     return length;
 }
@@ -263,21 +262,26 @@ bool packed_bit_array_get(uint8_t *bits, size_t i)
     return (bits[byte_idx] >> in_byte_idx) & 1;
 }
 
-void read_public_key_compressed(Compressed *out, const char *pubkeyBase58)
+// Note: does not validate the address
+void read_public_key_compressed(Compressed *out, const char *address)
 {
-    size_t pubkeyBytesLen = 40;
-    uint8_t pubkeyBytes[40];
-    b58_decode(pubkeyBytes, &pubkeyBytesLen, pubkeyBase58, 0);
+    if (strnlen(address, MINA_ADDRESS_LEN) != MINA_ADDRESS_LEN - 1) {
+        return;
+    }
+
+    uint8_t bytes[40];
+    size_t bytes_len = 40;
+    b58_decode(bytes, &bytes_len, address, MINA_ADDRESS_LEN - 1);
 
     struct bytes {
         uint8_t version;
         uint8_t payload[35];
         uint8_t checksum[4];
-    } *raw = (struct bytes *)pubkeyBytes;
+    } *raw = (struct bytes *)bytes;
 
     // Extract x-coordinate and swap big endian order
     for (size_t i = 2; i < sizeof(raw->payload) - 1; i++) {
-        out->x[sizeof(Field) - (i - 1)] = raw->payload[i];
+        out->x[FIELD_BYTES - (i - 1)] = raw->payload[i];
     }
     out->is_odd = (bool)raw->payload[34];
 }

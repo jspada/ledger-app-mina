@@ -1,6 +1,6 @@
 #include "menu.h"
 
-#ifdef UNIT_TESTS
+#ifdef ON_DEVICE_UNIT_TESTS
 UX_STEP_NOCB(
     ux_idle_flow_1_step,
     pnn,

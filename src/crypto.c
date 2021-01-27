@@ -11,8 +11,6 @@
 //         GROUP_ORDER   = 28948022309329048855892746252171976963363056481941647379679742748393362948097 (Fq, 0x94)
 //         FIELD_MODULUS = 28948022309329048855892746252171976963363056481941560715954676764349967630337 (Fp, 0x4c)
 
-#include <os.h>
-
 #include "crypto.h"
 #include "poseidon.h"
 #include "utils.h"
@@ -130,11 +128,9 @@ static const Affine AFFINE_ONE = {
     }
 };
 
-void field_copy(Field a, const Field b)
+void field_copy(Field b, const Field a)
 {
-    for (size_t i = 0; i < sizeof(Field); i++) {
-        a[i] = b[i];
-    }
+    os_memmove(b, a, FIELD_BYTES);
 }
 
 void field_add(Field c, const Field a, const Field b)
@@ -152,9 +148,9 @@ void field_mul(Field c, const Field a, const Field b)
     cx_math_multm(c, a, b, FIELD_MODULUS, FIELD_BYTES);
 }
 
-void field_sq(Field c, const Field a)
+void field_sq(Field b, const Field a)
 {
-    cx_math_multm(c, a, a, FIELD_MODULUS, FIELD_BYTES);
+    cx_math_multm(b, a, a, FIELD_MODULUS, FIELD_BYTES);
 }
 
 void field_inv(Field c, const Field a)
@@ -184,11 +180,43 @@ bool field_is_odd(const Field y)
     return y[FIELD_BYTES - 1] & 0x01;
 }
 
-void scalar_copy(Scalar a, const Scalar b)
+void scalar_from_bytes(Scalar a, const uint8_t *bytes, size_t len)
 {
-    for (size_t i = 0; i < sizeof(Scalar); i++) {
-        a[i] = b[i];
+    if (len != SCALAR_BYTES) {
+        THROW(INVALID_PARAMETER);
     }
+
+    if (a != bytes) {
+        os_memcpy(a, bytes, SCALAR_BYTES);
+    }
+
+    // Make sure the scalar is in [0, p)
+    //
+    // Note: Mina does rejection sampling to obtain a scalar in
+    // [0, p), where the field modulus
+    //
+    //     p = 28948022309329048855892746252171976963363056481941560715954676764349967630337
+    //
+    // Due to constraints, this implementation take a different
+    // approach and just unsets the top two bits of the 256bit bip44
+    // secret, so
+    //
+    //     max = 28948022309329048855892746252171976963317496166410141009864396001978282409983.
+    //
+    // If p < max then we could still generate invalid scalars
+    // (although it's highly unlikely), but
+    //
+    //     p - max = 45560315531419706090280762371685220354
+    //
+    // Thus, we cannot generate invalid scalar and instead lose an
+    // insignificant amount of entropy.
+
+    a[0] &= 0x3f; // drop first two bits
+}
+
+void scalar_copy(Scalar b, const Scalar a)
+{
+    os_memmove(b, a, SCALAR_BYTES);
 }
 
 void scalar_add(Scalar c, const Scalar a, const Scalar b)
@@ -206,15 +234,15 @@ void scalar_mul(Scalar c, const Scalar a, const Scalar b)
     cx_math_multm(c, a, b, GROUP_ORDER, SCALAR_BYTES);
 }
 
-void scalar_sq(Scalar c, const Scalar a)
+void scalar_sq(Scalar b, const Scalar a)
 {
-    cx_math_multm(c, a, a, GROUP_ORDER, SCALAR_BYTES);
+    cx_math_multm(b, a, a, GROUP_ORDER, SCALAR_BYTES);
 }
 
-void scalar_negate(Field c, const Field a)
+void scalar_negate(Field b, const Field a)
 {
     // Ledger API expects inputs to be in range [0, GROUP_ORDER)
-    cx_math_subm(c, SCALAR_ZERO, a, GROUP_ORDER, SCALAR_BYTES);
+    cx_math_subm(b, SCALAR_ZERO, a, GROUP_ORDER, SCALAR_BYTES);
 }
 
 // c = a^e mod m
@@ -233,20 +261,9 @@ bool scalar_is_zero(const Scalar a)
     return scalar_eq(a, SCALAR_ZERO);
 }
 
-void projective_to_affine(Affine *r, const Group *p)
+void group_copy(Group *b, const Group *a)
 {
-    if (field_eq(p->Z, FIELD_ZERO)) {
-        os_memcpy(r->x, FIELD_ZERO, FIELD_BYTES);
-        os_memcpy(r->y, FIELD_ZERO, FIELD_BYTES);
-        return;
-    }
-
-    Field zi, zi2, zi3;
-    field_inv(zi, p->Z);        // 1/Z
-    field_mul(zi2, zi, zi);     // 1/Z^2
-    field_mul(zi3, zi2, zi);    // 1/Z^3
-    field_mul(r->x, p->X, zi2); // X/Z^2
-    field_mul(r->y, p->Y, zi3); // Y/Z^3
+    os_memmove(b, a, sizeof(Group));
 }
 
 // zero is the only point with Z = 0 in jacobian coordinates
@@ -260,7 +277,7 @@ bool group_is_zero(const Group *p)
 void group_dbl(Group *r, const Group *p)
 {
     if (group_is_zero(p)) {
-        *r = *p;
+        group_copy(r, p);
         return;
     }
 
@@ -297,12 +314,12 @@ void group_dbl(Group *r, const Group *p)
 void group_add(Group *r, const Group *p, const Group *q)
 {
     if (group_is_zero(p)) {
-        *r = *q;
+        group_copy(r, q);
         return;
     }
 
     if (group_is_zero(q)) {
-        *r = *p;
+        group_copy(r, p);
         return;
     }
 
@@ -336,18 +353,23 @@ void group_add(Group *r, const Group *p, const Group *q)
     field_mul(t0, U2, P);      // t0 = P^3
     field_mul(S2, S1, t0);     // S2 = S1*t0
 
-    Field t3, t4;
+    field_mul(U1, R, t2);      // U1 = R*t2
+    field_sub(r->Y, U1, S2);   // Y3 = t3-S2
+    field_mul(U2, q->Z, P);    // U2 = Z2*P
+    field_mul(r->Z, p->Z, U2); // Z3 = Z1*t4
+}
 
-    field_mul(t3, R, t2);      // t3 = R*t2
-    field_sub(r->Y, t3, S2);   // Y3 = t3-S2
-    field_mul(t4, q->Z, P);    // t4 = Z2*P
-    field_mul(r->Z, p->Z, t4); // Z3 = Z1*t4
+void group_negate(Group *q, const Group *p)
+{
+    field_copy(q->X, p->X);
+    field_negate(q->Y, p->Y);
+    field_copy(q->Z, p->Z);
 }
 
 // Double-and-add scalar multiplication
 void group_scalar_mul(Group *q, const Scalar k, const Group *p)
 {
-    *q = GROUP_ZERO;
+    group_copy(q, &GROUP_ZERO);
     if (group_is_zero(p)) {
         return;
     }
@@ -356,17 +378,17 @@ void group_scalar_mul(Group *q, const Scalar k, const Group *p)
     }
 
     Group t0;
-    for (size_t i = SCALAR_OFFSET; i < SCALAR_BITS; i++) {
+    for (size_t i = 0; i < SCALAR_BITS; i++) {
         uint8_t di = (k[i / 8] >> (7 - (i % 8))) & 0x01;
 
         // q = 2q
         group_dbl(&t0, q);
-        *q = t0;
+        group_copy(q, &t0);
 
         if (di) {
             // q = q + p
             group_add(&t0, q, p);
-            *q = t0;
+            group_copy(q, &t0);
         }
     }
 }
@@ -409,35 +431,78 @@ bool affine_is_zero(const Affine *p)
     return field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO);
 }
 
-void affine_to_projective(Group *r, const Affine *p)
+void affine_to_group(Group *q, const Affine *p)
 {
     if (field_eq(p->x, FIELD_ZERO) && field_eq(p->y, FIELD_ZERO)) {
-        os_memcpy(r->X, FIELD_ZERO, FIELD_BYTES);
-        os_memcpy(r->Y, FIELD_ONE, FIELD_BYTES);
-        os_memcpy(r->Z, FIELD_ZERO, FIELD_BYTES);
+        field_copy(q->X, FIELD_ZERO);
+        field_copy(q->Y, FIELD_ONE);
+        field_copy(q->Z, FIELD_ZERO);
         return;
     }
 
-    os_memcpy(r->X, p->x, FIELD_BYTES);
-    os_memcpy(r->Y, p->y, FIELD_BYTES);
-    os_memcpy(r->Z, FIELD_ONE, FIELD_BYTES);
+    field_copy(q->X, p->x);
+    field_copy(q->Y, p->y);
+    field_copy(q->Z, FIELD_ONE);
 }
 
-void affine_scalar_mul(Affine *r, const Scalar k, const Affine *p)
+void affine_from_group(Affine *q, const Group *p)
 {
-    Group pp, pr;
-    affine_to_projective(&pp, p);
-    group_scalar_mul(&pr, k, &pp);
-    projective_to_affine(r, &pr);
+    if (field_eq(p->Z, FIELD_ZERO)) {
+        field_copy(q->x, FIELD_ZERO);
+        field_copy(q->y, FIELD_ZERO);
+        return;
+    }
+
+    Field zi, tmp;
+    field_inv(zi, p->Z);         // 1/Z
+    field_mul(q->y, zi, zi);     // 1/Z^2
+    field_mul(tmp, q->y, zi);    // 1/Z^3
+    field_mul(q->x, p->X, q->y); // X/Z^2
+    field_mul(q->y, p->Y, tmp);  // Y/Z^3
 }
 
-// Ledger uses:
-// - BIP39 to generate and interpret the master seed, which produces
-//   the 24 words shown on the device at startup.
-// - BIP32 for HD key derivation (using the child key derivation
-//   function)
-// - BIP44 for HD account derivation (so e.g. btc and mina keys don't
-//   clash)
+void affine_scalar_mul(Affine *q, const Scalar k, const Affine *p)
+{
+    Group pp, pq;
+    affine_to_group(&pp, p);
+    group_scalar_mul(&pq, k, &pp);
+    affine_from_group(q, &pq);
+}
+
+bool affine_eq(const Affine *p, const Affine *q)
+{
+    return field_eq(p->x, q->x) && field_eq(p->y, q->y);
+}
+
+void affine_add(Affine *r, const Affine *p, const Affine *q)
+{
+    Group gr, gp, gq;
+    affine_to_group(&gp, p);
+    affine_to_group(&gq, q);
+    group_add(&gr, &gp, &gq);
+    affine_from_group(r, &gr);
+}
+
+void affine_negate(Affine *q, const Affine *p)
+{
+    Group gq, gp;
+    affine_to_group(&gp, p);
+    group_negate(&gq, &gp);
+    affine_from_group(q, &gq);
+}
+
+bool affine_is_on_curve(const Affine *p)
+{
+    Group gp;
+    affine_to_group(&gp, p);
+    return group_is_on_curve(&gp);
+}
+
+void generate_pubkey(Affine *pub_key, const Scalar priv_key)
+{
+    affine_scalar_mul(pub_key, priv_key, &AFFINE_ONE);
+}
+
 void generate_keypair(Keypair *keypair, uint32_t account)
 {
     if (!keypair) {
@@ -452,40 +517,21 @@ void generate_keypair(Keypair *keypair, uint32_t account)
         0
     };
 
+    // Generate private key
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path, BIP32_PATH_LEN, keypair->priv, NULL);
+    scalar_from_bytes(keypair->priv, keypair->priv, sizeof(keypair->priv));
 
-    // Make sure the private key is in [0, p)
-    //
-    // Note: Mina does rejection sampling to obtain a private key in
-    // [0, p), where the field modulus
-    //
-    //     p = 28948022309329048855892746252171976963363056481941560715954676764349967630337
-    //
-    // Due to constraints, this implementation take a different
-    // approach and just unsets the top two bits of the 256bit bip44
-    // secret, so
-    //
-    //     max = 28948022309329048855892746252171976963317496166410141009864396001978282409983.
-    //
-    // If p < max then we could still generate invalid private keys
-    // (although it's highly unlikely), but
-    //
-    //     p - max = 45560315531419706090280762371685220354
-    //
-    // Thus, we cannot generate invalid private keys and instead lose an
-    // insignificant amount of entropy.
-
-    keypair->priv[0] &= 0x3f; // drop first two bits
-
-    affine_scalar_mul(&keypair->pub, keypair->priv, &AFFINE_ONE);
+    // Generate public key
+    generate_pubkey(&keypair->pub, keypair->priv);
 
     return;
 }
 
-int get_address(char *address, const size_t len, const Affine *pub_key)
+bool generate_address(char *address, const size_t len, const Affine *pub_key)
 {
     if (len != MINA_ADDRESS_LEN) {
-        THROW(INVALID_PARAMETER);
+        address[0] = '\0';
+        return false;
     }
 
     struct bytes {
@@ -504,55 +550,87 @@ int get_address(char *address, const size_t len, const Affine *pub_key)
     // y-coordinate parity
     raw.payload[34] = field_is_odd(pub_key->y);
 
-    uint8_t hash1[32];
-    cx_hash_sha256((const unsigned char *)&raw, 36, hash1, 32);
+    uint8_t hash1[CX_SHA256_SIZE];
+    cx_hash_sha256((const unsigned char *)&raw, 36, hash1, sizeof(hash1));
 
-    uint8_t hash2[32];
-    cx_hash_sha256(hash1, 32, hash2, 32);
-    os_memmove(raw.checksum, hash2, 4);
+    uint8_t hash2[CX_SHA256_SIZE];
+    cx_hash_sha256(hash1, sizeof(hash1), hash2, sizeof(hash2));
+    os_memcpy(raw.checksum, hash2, 4);
 
     // Encode as address
     int result = b58_encode((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
+    address[MINA_ADDRESS_LEN - 1] = '\0';
     if (result < 0) {
         address[0] = '\0';
+        return false;
     }
-    else {
-        address[MINA_ADDRESS_LEN - 1] = '\0';
+    if (result != MINA_ADDRESS_LEN - 1) {
+        address[0] = '\0';
+        return false;
     }
 
-    return result;
+    return true;
 }
 
-void generate_pubkey(Affine *pub_key, const Scalar priv_key)
+bool validate_address(const char *address)
 {
-    affine_scalar_mul(pub_key, priv_key, &AFFINE_ONE);
+    uint8_t bytes[40];
+    size_t bytes_len = sizeof(bytes);
+
+    if (strnlen(address, MINA_ADDRESS_LEN) != MINA_ADDRESS_LEN - 1) {
+        return false;
+    }
+
+    b58_decode(bytes, &bytes_len, address, MINA_ADDRESS_LEN - 1);
+
+    struct bytes {
+        uint8_t version;
+        uint8_t payload[35];
+        uint8_t checksum[4];
+    } *raw = (struct bytes *)bytes;
+
+    uint8_t hash1[CX_SHA256_SIZE];
+    cx_hash_sha256((const unsigned char *)raw, 36, hash1, sizeof(hash1));
+
+    uint8_t hash2[CX_SHA256_SIZE];
+    cx_hash_sha256(hash1, sizeof(hash1), hash2, sizeof(hash2));
+    return os_memcmp(raw->checksum, hash2, 4) == 0;
 }
 
 void message_derive(Scalar out, const Keypair *kp, const ROInput *input)
 {
     uint8_t derive_msg[267] = { };
-    size_t derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input);
+    int derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input);
+    if (derive_len < 0) {
+        THROW(INVALID_PARAMETER);
+    }
 
     // blake2b hash
     cx_blake2b_t ctx;
     cx_blake2b_init(&ctx, 256);
     cx_hash(&ctx.header, 0, derive_msg, derive_len, NULL, 0);
-    Scalar bytes;
-    cx_hash(&ctx.header, CX_LAST, NULL, 0, bytes, ctx.ctx.outlen);
+    cx_hash(&ctx.header, CX_LAST, NULL, 0, out, ctx.ctx.outlen);
+
+    // Swap from little-endian to big-endian in place
+    for (size_t i = SCALAR_BYTES; i > SCALAR_BYTES/2; i--) {
+        uint8_t tmp;
+        tmp = out[i - 1];
+        out[i - 1] = out[SCALAR_BYTES - i];
+        out[SCALAR_BYTES - i] = tmp;
+    }
 
     // Convert to scalar
-    for (size_t i = sizeof(Scalar); i > 0; i--) {
-        out[i - 1] = bytes[sizeof(Scalar) - i]; // Reverse bytes
-    }
-    // Unset top two bits
-    out[0] &= 0x3f;
+    scalar_from_bytes(out, out, SCALAR_BYTES);
 }
 
 void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input)
 {
     Field hash_msg[9];
-    size_t hash_msg_len = roinput_hash_message(hash_msg, sizeof(hash_msg),
+    int hash_msg_len = roinput_hash_message(hash_msg, sizeof(hash_msg),
                                                pub, rx, input);
+    if (hash_msg_len < 0) {
+        THROW(INVALID_PARAMETER);
+    }
 
     // Initial sponge state
     State pos = {
@@ -582,32 +660,37 @@ void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *
 
 void sign(Signature *sig, const Keypair *kp, const ROInput *input)
 {
-    // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
     Scalar k;
-    message_derive(k, kp, input);
-
-    // r = k*g
     Affine r;
-    affine_scalar_mul(&r, k, &AFFINE_ONE);
-    field_copy(sig->rx, r.x);
+    Scalar tmp;
 
-    if (field_is_odd(r.y)) {
-        // k = -k
-        Scalar tmp;
-        scalar_copy(tmp, k);
-        scalar_negate(k, tmp);
+    BEGIN_TRY {
+        TRY {
+            // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
+            message_derive(k, kp, input);
+
+            // r = k*g
+            affine_scalar_mul(&r, k, &AFFINE_ONE);
+            field_copy(sig->rx, r.x);
+
+            if (field_is_odd(r.y)) {
+                // k = -k
+                scalar_copy(tmp, k);
+                scalar_negate(k, tmp);
+            }
+
+            // e = message_hash(input + kp.pub + r.x)
+            message_hash(sig->s, &kp->pub, r.x, input);
+
+            // s = k + e*sk
+            scalar_mul(tmp, sig->s, kp->priv);
+            scalar_add(sig->s, k, tmp);
+        }
+        FINALLY {
+            // Clear secrets from memory
+            explicit_bzero(tmp, sizeof(tmp));
+            explicit_bzero(k, sizeof(k));
+        }
+        END_TRY;
     }
-
-    // e = message_hash(input + kp.pub + r.x)
-    Scalar e;
-    message_hash(e, &kp->pub, r.x, input);
-
-    // s = k + e*sk
-    Scalar e_priv;
-    scalar_mul(e_priv, e, kp->priv);
-    scalar_add(sig->s, k, e_priv);
-
-    // Clear secrets from memory
-    os_memset(&k, 0, sizeof(k));
-    os_memset(&e_priv, 0, sizeof(e_priv));
 }

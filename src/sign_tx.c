@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "menu.h"
 #include "sign_tx.h"
 #include "utils.h"
 #include "crypto.h"
@@ -50,18 +51,10 @@ static void sign_transaction(void)
             // Get the account's private key and validate corresponding
             // public key matches the sender address
             generate_keypair(&_kp, _account);
-            int result = get_address(_address, sizeof(_address), &_kp.pub);
-            switch (result) {
-                case -2:
-                THROW(EXCEPTION_OVERFLOW);
-
-                case -1:
+            if (!generate_address(_address, sizeof(_address), &_kp.pub)) {
                 THROW(INVALID_PARAMETER);
-
-                default:
-                ; // SUCCESS
             }
-            if (strncmp(_address, _ui.sender, sizeof(_address)) != 0) {
+            if (os_memcmp(_address, _ui.sender, sizeof(_address)) != 0) {
                 THROW(INVALID_PARAMETER);
             }
 
@@ -83,7 +76,7 @@ static void sign_transaction(void)
         }
         FINALLY {
             // Clear private key from memory
-            os_memset((void *)_kp.priv, 0, sizeof(_kp.priv));
+            explicit_bzero((void *)_kp.priv, sizeof(_kp.priv));
         }
         END_TRY;
     }
@@ -292,7 +285,7 @@ UX_FLOW(ux_sign_delegate_tx_flow_all,
     &ux_sign_tx_flow_7_step
 );
 
-#ifdef UNIT_TESTS
+#ifdef ON_DEVICE_UNIT_TESTS
 
 UX_STEP_NOCB_INIT(
     ux_signing_step_2,
@@ -322,13 +315,13 @@ UX_FLOW(ux_unit_test_flow_1,
 #endif
 
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
-                    uint32_t dataLength, volatile unsigned int *flags,
+                    uint8_t dataLength, volatile unsigned int *flags,
                     volatile unsigned int *unused)
 {
-    UNUSED(dataLength);
+    UNUSED(p1);
     UNUSED(p2);
 
-    if (dataLength != 346) {
+    if (dataLength != 171) {
         THROW(INVALID_PARAMETER);
     }
 
@@ -340,6 +333,9 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     // 4-58: sender_address
     os_memcpy(_ui.sender, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
     _ui.sender[MINA_ADDRESS_LEN - 1] = '\0';
+    if (!validate_address(_ui.sender)) {
+        THROW(INVALID_PARAMETER);
+    }
     read_public_key_compressed(&_tx.source_pk, _ui.sender);
 
     // Always the same as sender for sent-payment and delegate txs
@@ -348,6 +344,9 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     // 59-113: receiver
     os_memcpy(_ui.receiver, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
     _ui.receiver[MINA_ADDRESS_LEN - 1] = '\0';
+    if (!validate_address(_ui.receiver)) {
+        THROW(INVALID_PARAMETER);
+    }
     read_public_key_compressed(&_tx.receiver_pk, _ui.receiver);
 
     // 114-121: amount
@@ -396,7 +395,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _tx.tag[1] = tag & 0x02;
     _tx.tag[2] = tag & 0x04;
 
-    #ifdef UNIT_TESTS
+    #ifdef ON_DEVICE_UNIT_TESTS
     ux_flow_init(0, ux_unit_test_flow_1, NULL);
     *flags |= IO_ASYNCH_REPLY;
     return;
