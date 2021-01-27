@@ -23,32 +23,55 @@ random_oracle_input.o: $(wildcard ../src/*.h) $(wildcard ../src/*.c)
 transaction.o: $(wildcard ../src/*.h) $(wildcard ../src/*.c)
 	$(CC) -Wall -Werror -I ../src ../src/transaction.c -c
 
+ifneq (,$(wildcard ../emulator.pid))
+EMULATOR_PID=`cat ../emulator.pid`
+endif
+# stop_emulator:
+# ifneq (,$(wildcard ../emulator.pid))
+# 	@echo "Stopping emulator with PID $(EMULATOR_PID)"
+# 	@kill $(EMULATOR_PID) >/dev/null 2>&1 || true
+# 	@rm -f ../emulator.pid
+# endif
+
+TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
+              elegant kitchen state purpose matrix gas grid enable frown road \
+			  goddess glove canyon key
+
 define EMULATOR_TESTS_SCRIPT
 echo "Starting emulator"
-./speculos/speculos.py --display headless \
-                       --automation file:./emulator_automation.json \
-                       -s 'course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key' \
+../dev-env/speculos/speculos.py --display headless \
+                       --automation file:../emulator_automation.json \
+                       -s "$(TEST_MNEMONIC)" \
                        ../bin/app.elf > emulator_tests.log 2>&1 &
 PID1=$$!
+echo $$PID1 > ../emulator.pid
 sleep 1
 LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PORT=9999 ./unit_tests.py
 echo "Stopping emulator"
-kill $${PID1}
+kill $${PID1} > /dev/null 2>&1 || true
 endef
 
 export EMULATOR_TESTS_SCRIPT
-emulator_tests: speculos/build/src/launcher emulator_automation.json $(wildcard ../src/*.h) $(wildcard ../src/*.c)
+emulator_tests: ../bin/app.elf ../dev-env/speculos/build/src/launcher ../emulator_automation.json
 	@echo "$$EMULATOR_TESTS_SCRIPT" > $@
 	@chmod +x $@
-ifeq ("$(SKIP_EMULATOR_TESTS)","")
+ifeq ("$(NO_EMULATOR)","")
+ifneq (,$(wildcard ../emulator.pid))
+	@echo "Stopping emulator with PID $(EMULATOR_PID)"
+	@kill $(EMULATOR_PID) >/dev/null 2>&1 || true
+	@rm -f ../emulator.pid
+endif
 	@./$@
 endif
 
-speculos/build/src/launcher: speculos
-ifeq ("$(SKIP_EMULATOR_TESTS)","")
+../bin/app.elf: $(wildcard ../src/*.h) $(wildcard ../src/*.c)
+	$(MAKE) -C .. default
+
+../dev-env/speculos/build/src/launcher: ../dev-env/speculos
+ifeq ("$(NO_EMULATOR)","")
 	cd $<; cmake -Bbuild -H.
 	$(MAKE) -C $</build
 endif
 
 clean:
-	rm -rf *.o *.log utils_tests random_oracle_input_tests emulator_tests speculos/build
+	rm -rf *.o *.log utils_tests random_oracle_input_tests emulator_tests

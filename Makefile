@@ -38,16 +38,10 @@ else
 	ICONNAME=icons/nanos_app_mina.gif
 endif
 
-ifeq ("$(SKIP_EMULATOR_TESTS)","")
-ifeq (,$(wildcard tests/speculos/CMakeLists.txt))
-$(error Submodules missing: use 'git submodule update --init --recursive' or set SKIP_EMULATOR_TESTS=1.)
-endif
-endif
-
 ################
 # Default rule #
 ################
-all: default unit_tests
+all: default stop_emulator test
 
 ############
 # Platform #
@@ -154,38 +148,109 @@ load-offline: all
 delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
-release: all
+dev-env/speculos/build/src/launcher: dev-env/speculos
+ifeq ("$(NO_EMULATOR)","")
+	cd $<; cmake -Bbuild -H.
+	$(MAKE) -C $</build
+endif
+
+ifneq (,$(wildcard emulator.pid))
+EMULATOR_PID=`cat ./emulator.pid`
+endif
+stop_emulator:
+ifneq (,$(wildcard emulator.pid))
+	@echo "Stopping emulator with PID $(EMULATOR_PID)"
+	@kill $(EMULATOR_PID) >/dev/null 2>&1 || true
+	rm -f ./emulator.pid
+endif
+
+test:
+	$(MAKE) -C tests
+
+TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
+              elegant kitchen state purpose matrix gas grid enable frown road \
+              goddess glove canyon key
+
+ifeq ("$(NO_EMULATOR)","")
+ifeq (,$(wildcard ./dev-env/speculos/CMakeLists.txt))
+$(error Submodules missing: use 'git submodule update --init --recursive' or set NO_EMULATOR=1.)
+endif
+endif
+
+ifneq ("$(AUTOMATION)","")
+EMULATOR_AUTOMATION=--automation file:./emulator_automation.json
+else
+EMULATOR_AUTOMATION=
+endif
+
+run: all dev-env/speculos/build/src/launcher
+	@if [ -z $(NO_EMULATOR) ]; then \
+	    echo "Running emulator" ; \
+	    ./dev-env/speculos/speculos.py --ontop $(EMULATOR_AUTOMATION) \
+	                       -s "$(TEST_MNEMONIC)" \
+	                       ./bin/app.elf > emulator.log 2>&1 & \
+	    echo $$! > emulator.pid ; \
+	else \
+	echo "Error: cannot run emulator with NO_EMULATOR environmental variable set"; \
+	    exit 1; \
+	fi
+
+define RELEASE_README
+ledger-app-mina-$(VERSION_TAG)
+
+Contents
+    ./install.sh         - Load app onto Ledger device
+    ./uninstall.sh       - Delete app from Ledger device
+    ./mina_ledger_wallet - Command-line wallet
+
+For more details visit https://github.com/jspada/ledger-app-mina
+endef
+export RELEASE_README
+
+define RELEASE_DEPS
+if ! which python3 > /dev/null 2>&1 ; then
+    echo "Error: Please install python3"
+	exit 211;
+fi
+if ! which pip3 > /dev/null 2>&1 ; then
+    echo "Error: Please install pip3"
+	exit
+fi
+if ! pip3 -q show ledgerblue ; then
+    echo "Error: please pip3 install ledgerblue"
+	exit
+fi
+read -p "Please unlock your Ledger device and exit any apps (press any key to continue) " unused
+endef
+export RELEASE_DEPS
+
+release: clean all
 	@echo "Packaging release... ledger-app-mina-$(VERSION_TAG).tar.gz"
-	@echo "Contents" > README
-	@echo "    ./install.sh         - Load Mina app onto Ledger device" >> README
-	@echo "    ./uninstall.sh       - Delete Mina app from Ledger device" >> README
-	@echo "    ./mina_ledger_wallet - Mina Ledger command-line wallet" >> README
-	@echo 'if ! which python3 > /dev/null 2>&1 ; then echo "Error: Please install python3"  && exit ; fi' > preamble
-	@echo 'if ! which pip3 > /dev/null 2>&1 ; then echo "Error: Please install pip3"  && exit ; fi' >> preamble
-	@echo 'if ! pip3 -q show ledgerblue ; then echo "Error: please pip3 install ledgerblue" && exit ; fi' >> preamble
-	@echo 'read -p "Please unlock your Ledger device and exit any apps (press any key to continue) " unused' >> preamble
-	@cat preamble > install.sh
+
+	@echo "$$RELEASE_README" > README.txt
+
+	@echo "$$RELEASE_DEPS" > install.sh
 	@echo "python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS_EVALUATED)" >> install.sh
-	@cat preamble > uninstall.sh
+	@chmod +x install.sh
+
+	@echo "$$RELEASE_DEPS" > uninstall.sh
 	@echo "python3 -m ledgerblue.deleteApp $(APP_DELETE_PARAMS_EVALUATED)" > uninstall.sh
-	@chmod +x install.sh uninstall.sh
+	@chmod +x uninstall.sh
+
 	@cp utils/mina_ledger_wallet.py mina_ledger_wallet
 	@sed -i 's/__version__ = "1.0.0"/__version__ = "$(VERSION_TAG)"/' mina_ledger_wallet
 	@tar -zcf ledger-app-mina-$(VERSION_TAG).tar.gz \
 	        --transform "s,^,ledger-app-mina-$(VERSION_TAG)/," \
-		README \
+	        README.txt \
 	        install.sh \
 	        uninstall.sh \
 	        mina_ledger_wallet \
 	        bin/app.hex
-	@rm README
-	@rm preamble
-	@rm install.sh
-	@rm uninstall.sh
-	@rm mina_ledger_wallet
 
-unit_tests: tests
-	$(MAKE) --directory=$<
+	@rm -f README.txt
+	@rm -f install.sh
+	@rm -f uninstall.sh
+	@rm -f mina_ledger_wallet
 
 # import generic rules from the sdk
 include $(BOLOS_SDK)/Makefile.rules
@@ -193,9 +258,9 @@ include $(BOLOS_SDK)/Makefile.rules
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
 
-clean:
-	rm -fr obj bin debug dep $(GLYPH_DESTC) $(GLYPH_DESTH)
+allclean: clean
 	$(MAKE) --directory=tests clean
+	rm -rf dev-env/speculos/build
 
 listvariants:
 	@echo VARIANTS COIN mina
