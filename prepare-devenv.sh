@@ -25,8 +25,7 @@ if [[ $(cat /etc/udev/rules.d/20-hw1.rules) == *'ATTRS{idVendor}=="2c97", ATTRS{
 fi
 
 
-if [ ! -d dev-env ]; then
-    mkdir dev-env
+if [ ! -d dev-env/SDK ] ; then
     mkdir dev-env/SDK
     mkdir dev-env/CC
     mkdir dev-env/CC/others
@@ -57,6 +56,11 @@ if [ ! -d dev-env ]; then
     tar xf nanos-secure-sdk.tar.gz
     rm nanos-secure-sdk.tar.gz
     mv nanos-secure-sdk* dev-env/SDK/nanos-secure-sdk
+
+    wget https://github.com/LedgerHQ/nanox-secure-sdk/archive/1.2.4-5.1.tar.gz -O nanox-secure-sdk.tar.gz
+    tar xf nanox-secure-sdk.tar.gz
+    rm nanox-secure-sdk.tar.gz
+    mv nanox-secure-sdk* dev-env/SDK/nanox-secure-sdk
 
     python3 -m venv dev-env/ledger_py3
     source dev-env/ledger_py3/bin/activate
