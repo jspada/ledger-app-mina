@@ -46,8 +46,8 @@ echo "Starting emulator"
 PID1=$$!
 echo $$PID1 > ../emulator.pid
 sleep 1
-LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PORT=9999 ./unit_tests.py
-echo "Stopping emulator"
+LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PORT=9999 ./unit_tests.py || (rm -f ./emulator_tests && exit 211)
+echo "Stopping emulator on pid $$PID1"
 kill $${PID1} > /dev/null 2>&1 || true
 endef
 

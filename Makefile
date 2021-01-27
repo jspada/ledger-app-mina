@@ -189,7 +189,7 @@ run: all dev-env/speculos/build/src/launcher
 	    ./dev-env/speculos/speculos.py --ontop $(EMULATOR_AUTOMATION) \
 	                       -s "$(TEST_MNEMONIC)" \
 	                       ./bin/app.elf > emulator.log 2>&1 & \
-	    echo $$! > emulator.pid ; \
+	    echo $$! > emulator.pid || exit 211; \
 	else \
 	echo "Error: cannot run emulator with NO_EMULATOR environmental variable set"; \
 	    exit 1; \
