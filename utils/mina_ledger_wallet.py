@@ -8,6 +8,7 @@ import requests
 import binascii
 import ctypes
 import string
+import os
 
 COIN = 1000000000
 
@@ -80,7 +81,7 @@ def valid_valid_until(valid_until):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', default=False, action="store_true", help='Verbose mode')
-    parser.add_argument('--cstruct', default=False, action="store_true", help='Cstruct mode')
+    parser.add_argument('--cstruct', default=False, action="store_true", help='Dump cstruct of ledger hex responses')
     parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
     subparsers = parser.add_subparsers(dest='operation')
     subparsers.required = True
@@ -111,9 +112,10 @@ if __name__ == "__main__":
     delegate_payment_parser.add_argument('--nonce', help='Nonce override')
     delegate_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     delegate_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
-    validate_payment_parser = subparsers.add_parser('validate')
-    validate_payment_parser.add_argument('validate_bip44_account', type=valid_account, help='BIP44 account to validate (e.g. 42)')
-    validate_payment_parser.add_argument('validate_address', type=valid_address("Validation"), help='Address to validate')
+    test_transaction_parser = subparsers.add_parser('test-transaction')
+    test_transaction_parser.add_argument('account_number', type=valid_account, help='BIP44 account generate test transaction with. e.g. 42.')
+    test_transaction_parser.add_argument('account_address', type=valid_address("Account"), help='Mina address corresponding to BIP44 account')
+    test_transaction_parser.add_argument('--interactive', default=False, action="store_true", help='Interactive mode')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -128,7 +130,7 @@ def rosetta_network_request():
     network_resp = requests.post(MINA_URL + '/network/list',
                                 data=json.dumps(network_request)).json()
 
-    # Validate
+    # Validate response
     if "network_identifiers" not in network_resp:
         print("error")
         if VERBOSE:
@@ -643,13 +645,15 @@ def from_currency(amount):
     return int(float(amount)*COIN)
 
 def tx_type_name(op):
-    if op == "send-payment" or op == "validate":
+    if op == "send-payment":
         return "Payment"
     elif op == "delegate":
         return "Delegation"
+    elif op == "test-transaction":
+        return "Test"
 
 def tx_type_from_op(op):
-    if op == "send-payment" or op == "validate":
+    if op == "send-payment" or op == "test-transaction":
         return TX_TYPE_PAYMENT
     elif op == "delegate":
         return TX_TYPE_DELEGATION
@@ -683,12 +687,9 @@ if __name__ == "__main__":
 
             print("Get address for account {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(args.account_number, args.account_number))
 
-            while True:
-                answer = str(input("Continue? (y/N) ")).lower().strip()
-                if answer == 'y':
-                    break
-                else:
-                    sys.exit(211)
+            answer = str(input("Continue? (y/N) ")).lower().strip()
+            if answer != 'y':
+                sys.exit(211)
 
             print("Generating address (please confirm on Ledger device)... ", end="", flush=True)
             address = ledger_get_address(int(args.account_number))
@@ -719,7 +720,7 @@ if __name__ == "__main__":
             print("Balance: {}".format(to_currency(balance)))
             print()
 
-        elif args.operation == "send-payment" or args.operation == "delegate" or args.operation == "validate":
+        elif args.operation == "send-payment" or args.operation == "delegate":
             ledger_init()
 
             # Set common user supplied parameters
@@ -732,11 +733,6 @@ if __name__ == "__main__":
                 account = args.delegator_bip44_account
                 sender = args.delegator_address
                 receiver = args.delegate
-                amount = 0
-            elif args.operation == "validate":
-                account = args.delegator_bip44_account
-                sender = args.validate_address
-                receiver = args.validate_address
                 amount = 0
 
             # Set optional memo
@@ -772,13 +768,9 @@ if __name__ == "__main__":
                 print("Using nonce override: {}".format(args.nonce))
                 nonce = int(args.nonce)
 
-            if args.operation == "validate":
-                # Ensure that this transaction is never sent by providing an insufficient fee
-                fee = 0
-
             balance = rosetta_balance_request(sender)
 
-            if amount + fee > balance and args.operation != "validate":
+            if amount + fee > balance:
                 if args.operation == "send-payment":
                     print("Total amount {} exceeds account balance {}".format(to_currency(amount + fee), to_currency(balance)))
                 else:
@@ -790,7 +782,7 @@ if __name__ == "__main__":
             print("    Type:        {}".format(tx_type_name(args.operation)))
             print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
-            if args.operation == "send-payment" or args.operation == "validate":
+            if args.operation == "send-payment":
                 print("    Sender:      {} (balance {})".format(sender, to_currency(balance)))
                 print("    Receiver:    {}".format(receiver))
                 print("    Amount:      {:.9f}".format(to_currency(amount)))
@@ -799,7 +791,7 @@ if __name__ == "__main__":
                 print("    Delegate:    {}".format(receiver))
 
             print("    Fee:         {:.9f}".format(to_currency(fee)))
-            if args.operation == "send-payment" or args.operation == "validate":
+            if args.operation == "send-payment":
                 print("    Total:       {:.9f}".format(to_currency(amount + fee)))
             print("    Nonce:       {}".format(nonce))
 
@@ -888,9 +880,7 @@ if __name__ == "__main__":
                 print("\nSIGNED_TX   = {}\n".format(json.dumps(signed_payload)))
 
             # Rosetta parse
-            if args.operation == "validate":
-                rosetta_parse_request(signed_tx)
-                sys.exit(0)
+            # rosetta_parse_request(signed_tx)
 
             # Security check rosetta output 2
             if not check_tx(tx_type_from_op(args.operation),
@@ -948,6 +938,70 @@ if __name__ == "__main__":
 
             print()
             print("Transaction id: {}".format(tx_hash))
+
+        elif args.operation == "test-transaction":
+            ledger_init()
+
+            account = args.account_number
+            address = args.account_address
+            memo = os.urandom(16).hex()
+
+            if len(memo) != 32:
+                raise Exception("Failed to get memo entropy")
+
+            if args.interactive:
+                print()
+                print("Generate test transaction:")
+                print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
+                print("    Address:     {}".format(address))
+                print()
+                answer = str(input("Continue? (y/N) ")).lower().strip()
+                if answer != 'y':
+                    sys.exit(211)
+
+            # Tell Ledger to construct, verify and sign the tx
+            if args.interactive:
+                print()
+                print("Signing transaction (please confirm on Ledger device)... ", end="", flush=True)
+            signature = ledger_sign_tx(tx_type_from_op(args.operation),
+                                       account,
+                                       address,
+                                       address,
+                                       0,
+                                       0,
+                                       0,
+                                       0,
+                                       memo)
+            if args.interactive:
+                print("done")
+
+            test_transaction_json = json.loads(r"""{
+                "signature": "",
+                "payment": {
+                    "to": "",
+                    "from": "",
+                    "fee": "0",
+                    "token": "1",
+                    "nonce": "0",
+                    "memo": "",
+                    "amount": "0",
+                    "valid_until": "0"
+                 },
+                 "stake_delegation": null,
+                 "create_token": null,
+                 "create_token_account": null,
+                 "mint_tokens": null
+            }""")
+
+            test_transaction_json["signature"] = signature
+            test_transaction_json["payment"]["to"] = address
+            test_transaction_json["payment"]["from"] = address
+            test_transaction_json["payment"]["memo"] = memo
+
+            if args.interactive:
+                print("")
+
+            print(json.dumps(test_transaction_json, indent=2))
 
     except ledgerblue.CommException as ex:
         if ex.sw == 26368:
