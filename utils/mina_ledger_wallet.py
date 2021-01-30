@@ -29,6 +29,12 @@ DONGLE = None
 
 __version__ = "1.0.0"
 
+def to_currency(amount):
+    return float(amount)/COIN
+
+def from_currency(amount):
+    return int(float(amount)*COIN)
+
 def valid_account(num):
     try:
         value = int(num)
@@ -40,12 +46,12 @@ def valid_account(num):
 
 def valid_amount(amount):
     try:
-        value = int(amount)
+        value = from_currency(amount)
         if value < 0 or value > MAX_AMOUNT:
             raise
     except:
         raise argparse.ArgumentTypeError("Must be in [0,{}]".format(MAX_AMOUNT))
-    return value
+    return amount
 
 def valid_nonce(nonce):
     try:
@@ -637,12 +643,6 @@ def print_cstruct(str):
         print("0x{:02x}, ".format(byte), end="", flush=True)
         i += 1
     print("\n};", flush=True)
-
-def to_currency(amount):
-    return float(amount)/COIN
-
-def from_currency(amount):
-    return int(float(amount)*COIN)
 
 def tx_type_name(op):
     if op == "send-payment":
