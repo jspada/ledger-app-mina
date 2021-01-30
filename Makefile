@@ -246,6 +246,10 @@ release: clean all
 	        uninstall.sh \
 	        mina_ledger_wallet \
 	        bin/app.hex
+	@tar xzf ledger-app-mina-$(VERSION_TAG).tar.gz
+	@zip -r ledger-app-mina-$(VERSION_TAG).zip ledger-app-mina-$(VERSION_TAG)/*
+	@rm --preserve-root -rf ledger-app-mina-$(VERSION_TAG)
+	@sha256sum ledger-app-mina-$(VERSION_TAG).tar.gz ledger-app-mina-$(VERSION_TAG).zip
 
 	@rm -f README.txt
 	@rm -f install.sh
