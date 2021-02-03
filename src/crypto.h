@@ -21,36 +21,39 @@
 
 #define COIN 1000000000ULL
 
+#define TESTNET_ID 0x00
+#define MAINNET_ID 0x01
+
 typedef uint8_t Field[FIELD_BYTES];
 typedef uint8_t Scalar[SCALAR_BYTES];
 
-typedef struct group {
+typedef struct group_t {
     Field X;
     Field Y;
     Field Z;
 } Group;
 
-typedef struct affine {
+typedef struct affine_t {
     Field x;
     Field y;
 } Affine;
 
-typedef struct compressed {
+typedef struct compressed_t {
     Field x;
     bool is_odd;
 } Compressed;
 
-typedef struct signature {
+typedef struct signature_t {
     Field rx;
     Scalar s;
 } Signature;
 
-typedef struct keypair {
+typedef struct keypair_t {
     Affine pub;
     Scalar priv;
 } Keypair;
 
-typedef struct roinput ROInput; // Forward declaration
+typedef struct roinput_t ROInput; // Forward declaration
 
 void field_copy(Field b, const Field a);
 void field_add(Field c, const Field a, const Field b);
@@ -58,7 +61,7 @@ void field_mul(Field c, const Field a, const Field b);
 void field_sq(Field b, const Field a);
 void field_pow(Field c, const Field a, const Field e);
 
-void scalar_from_bytes(Scalar a, const uint8_t *bytes, size_t len);
+void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len);
 void scalar_copy(Scalar b, const Scalar a);
 bool scalar_eq(const Scalar a, const Scalar b);
 void scalar_add(Scalar c, const Scalar a, const Scalar b);
@@ -76,4 +79,4 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key);
 bool generate_address(char *address, const size_t len, const Affine *pub_key);
 bool validate_address(const char *address);
 
-void sign(Signature *sig, const Keypair *kp, const ROInput *input);
+void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id);

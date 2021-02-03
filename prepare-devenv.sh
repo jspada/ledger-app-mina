@@ -14,6 +14,8 @@ elif [[ $1 != "blue" ]] && [[ $1 != "s" ]] && [[ $1 != "x" ]]; then
     return
 fi
 
+export NANO_MODEL="nano$1"
+
 if [[ $(dpkg-query -s python3-venv 2>&1) == *'is not installed'* ]]; then
     printf "\nPackage python3-venv is missing.\nOn Debian-like distros, run:\n\napt install python3-venv\n\n"
     return
@@ -81,3 +83,5 @@ elif [[ $1 == "x" ]]; then
     export BOLOS_SDK=$(pwd)/dev-env/SDK/nanox-secure-sdk
     export BOLOS_ENV=$(pwd)/dev-env/CC/nanox
 fi
+
+export PS1="$(echo $PS1 | sed 's/ledger_py3/ledger_py3, ${NANO_MODEL}/g') "

@@ -11,7 +11,10 @@ typedef uint64_t TokenId;
 typedef uint8_t  Memo[MEMO_BYTES];
 typedef bool     Tag[3];
 
-typedef struct transaction {
+#define PAYMENT_TX    0x00
+#define DELEGATION_TX 0x04
+
+typedef struct transaction_t {
     // common
     Currency   fee;
     TokenId    fee_token;

@@ -21,8 +21,8 @@ static const char B58_ALPHABET[] = {
 // >= 0 : OK
 // -2   : EXCEPTION_OVERFLOW
 // -1   : INVALID_PARAMETER
-int b58_encode(unsigned char *in, unsigned char length, unsigned char *out,
-               unsigned char maxoutlen)
+int b58_encode(const unsigned char *in, unsigned char length,
+               unsigned char *out, const unsigned char maxoutlen)
 {
     unsigned char tmp[164];
     unsigned char buffer[164];
@@ -160,12 +160,12 @@ bool b58_decode(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 	return true;
 }
 
-uint32_t read_uint32_be(uint8_t *buffer)
+uint32_t read_uint32_be(const uint8_t *buffer)
 {
   return (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | (buffer[3]);
 }
 
-uint64_t read_uint64_be(uint8_t *buffer)
+uint64_t read_uint64_be(const uint8_t *buffer)
 {
     return ((uint64_t)buffer[0] << 56) | ((uint64_t)buffer[1] << 48) |
             ((uint64_t)buffer[2] << 40) | ((uint64_t)buffer[3] << 32) |
@@ -173,7 +173,7 @@ uint64_t read_uint64_be(uint8_t *buffer)
             ((uint64_t)buffer[6] << 8) | ((uint64_t)buffer[7]);
 }
 
-char *amount_to_string(char *buf, size_t len, uint64_t amount)
+char *amount_to_string(char *buf, const size_t len, uint64_t amount)
 {
     // COIN = 1.000 000 000;
     size_t mantissa_len = 1;
@@ -219,7 +219,7 @@ char *amount_to_string(char *buf, size_t len, uint64_t amount)
     return buf;
 }
 
-char *value_to_string(char *buf, size_t len, uint64_t value)
+char *value_to_string(char *buf, const size_t len, uint64_t value)
 {
     // don't use log10() on ledger
     size_t digits = 0;
@@ -241,7 +241,7 @@ char *value_to_string(char *buf, size_t len, uint64_t value)
     return buf;
 }
 
-void packed_bit_array_set(uint8_t *bits, size_t i, bool b)
+void packed_bit_array_set(uint8_t *bits, const size_t i, const bool b)
 {
     size_t byte_idx = i / 8;
     size_t in_byte_idx = i % 8;
@@ -254,7 +254,7 @@ void packed_bit_array_set(uint8_t *bits, size_t i, bool b)
     }
 }
 
-bool packed_bit_array_get(uint8_t *bits, size_t i)
+bool packed_bit_array_get(const uint8_t *bits, const size_t i)
 {
     size_t byte_idx = i / 8;
     size_t in_byte_idx = i % 8;

@@ -8,8 +8,11 @@
 #include "random_oracle_input.h"
 #include "transaction.h"
 
+// Blockchain instance
+uint8_t _network_id;
+
 // Account variables
-static uint32_t _account = 0;
+static uint32_t _account;
 static Keypair  _kp;
 static char     _address[MINA_ADDRESS_LEN];
 
@@ -19,12 +22,11 @@ static Field       _input_fields[3];
 static uint8_t     _input_bits[TX_BITSTRINGS_BYTES];
 static ROInput     _roinput;
 static Signature   _sig;
-static char        _sig_hex[SIGNATURE_LEN];
 
 // UI variables
 static struct ui_t {
-    char sender[MINA_ADDRESS_LEN];
-    char receiver[MINA_ADDRESS_LEN];
+    char from[MINA_ADDRESS_LEN];
+    char to[MINA_ADDRESS_LEN];
     char amount[32];
     char fee[32];
     char total[32];
@@ -32,15 +34,15 @@ static struct ui_t {
     char valid_until[32];
     char memo[MEMO_BYTES - 1];
     char type[11];
-    char sender_title[10];
-    char receiver_title[9];
+    char from_title[10];
+    char to_title[9];
 } _ui;
 
 static uint8_t set_result_get_signature(void)
 {
     uint8_t tx = 0;
-    os_memmove(G_io_apdu_buffer + tx, _sig_hex, sizeof(_sig_hex));
-    tx += sizeof(_sig_hex);
+    os_memmove(G_io_apdu_buffer + tx, &_sig, sizeof(_sig));
+    tx += sizeof(_sig);
     return tx;
 }
 
@@ -49,12 +51,12 @@ static void sign_transaction(void)
     BEGIN_TRY {
         TRY {
             // Get the account's private key and validate corresponding
-            // public key matches the sender address
+            // public key matches the from address
             generate_keypair(&_kp, _account);
             if (!generate_address(_address, sizeof(_address), &_kp.pub)) {
                 THROW(INVALID_PARAMETER);
             }
-            if (os_memcmp(_address, _ui.sender, sizeof(_address)) != 0) {
+            if (os_memcmp(_address, _ui.from, sizeof(_address)) != 0) {
                 THROW(INVALID_PARAMETER);
             }
 
@@ -65,14 +67,7 @@ static void sign_transaction(void)
             _roinput.bits_capacity = ARRAY_LEN(_input_bits);
             transaction_to_roinput(&_roinput, &_tx);
 
-            sign(&_sig, &_kp, &_roinput);
-
-            uint8_t *p = (uint8_t *)&_sig;
-            for (size_t i = 0; i < sizeof(_sig); i++) {
-                snprintf(&_sig_hex[i*2], 3, "%02x", p[i]);
-            }
-            _sig_hex[SIGNATURE_LEN - 1] = '\0';
-
+            sign(&_sig, &_kp, &_roinput, _network_id);
         }
         FINALLY {
             // Clear private key from memory
@@ -85,233 +80,431 @@ static void sign_transaction(void)
 }
 
 UX_STEP_NOCB_INIT(
-    ux_signing_flow_step,
-    pb,
-    sign_transaction(),
-    {
-        &C_icon_processing,
-        "Done",
-    });
-
-UX_FLOW(ux_signing_flow,
-        &ux_signing_flow_step);
-
-UX_STEP_TIMEOUT(
-    ux_signing_comfort_step,
-    pb,
-    1,
-    ux_signing_flow,
-    {
-      &C_icon_processing,
-      "Signing...",
-    });
-
-UX_FLOW(ux_signing_comfort_flow,
-       &ux_signing_comfort_step);
-
-UX_STEP_NOCB(
-   ux_sign_tx_flow_0_step,
-   bnnn_paging,
-   {
-     .title = "Type",
-     .text = _ui.type,
-   });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_1_step,
-    bnnn_paging,
-    {
-      .title = _ui.sender_title,
-      .text = _ui.sender,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_2_step,
-    bnnn_paging,
-    {
-      .title = _ui.receiver_title,
-      .text = _ui.receiver,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_amount_step,
-    bn,
-    {
-      .line1 = "Amount",
-      .line2 = _ui.amount,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_4_step,
-    bn,
-    {
-      .line1 = "Fee",
-      .line2 = _ui.fee,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_total_step,
-    bn,
-    {
-      .line1 = "Total",
-      .line2 = _ui.total,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_5_step,
-    bn,
-    {
-      .line1 = "Nonce",
-      .line2 = _ui.nonce,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_valid_until_step,
-    bn,
-    {
-      .line1 = "Valid until",
-      .line2 = _ui.valid_until,
-    });
-UX_STEP_NOCB(
-    ux_sign_tx_flow_memo_step,
-    bnnn_paging,
-    {
-      .title = "Memo",
-      .text = _ui.memo,
-    });
-UX_STEP_VALID(
-    ux_sign_tx_flow_6_step,
-    pb,
-    ux_flow_init(0, ux_signing_comfort_flow, NULL);,
-    {
-      &C_icon_validate_14,
-      "Approve",
-    });
-UX_STEP_VALID(
-    ux_sign_tx_flow_7_step,
-    pb,
-    sendResponse(0, false),
-    {
-      &C_icon_crossmark,
-      "Reject",
-    });
-
-UX_FLOW(ux_sign_payment_tx_flow,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_amount_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_total_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_payment_tx_flow_valid_until,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_amount_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_total_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_valid_until_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_payment_tx_flow_memo,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_amount_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_total_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_memo_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_payment_tx_flow_all,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_amount_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_total_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_valid_until_step,
-    &ux_sign_tx_flow_memo_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_delegate_tx_flow,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_delegate_tx_flow_valid_until,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_valid_until_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_delegate_tx_flow_memo,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_memo_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-UX_FLOW(ux_sign_delegate_tx_flow_all,
-    &ux_sign_tx_flow_0_step,
-    &ux_sign_tx_flow_1_step,
-    &ux_sign_tx_flow_2_step,
-    &ux_sign_tx_flow_4_step,
-    &ux_sign_tx_flow_5_step,
-    &ux_sign_tx_flow_valid_until_step,
-    &ux_sign_tx_flow_memo_step,
-    &ux_sign_tx_flow_6_step,
-    &ux_sign_tx_flow_7_step
-);
-
-#ifdef ON_DEVICE_UNIT_TESTS
-
-UX_STEP_NOCB_INIT(
-    ux_signing_step_2,
+    ux_sign_tx_done_flow_done_step,
     pb,
     sign_transaction(),
     {
         &C_icon_validate_14,
-        "Done",
-    });
-
-UX_FLOW(ux_unit_test_flow_2,
-    &ux_signing_step_2
+        "Done"
+    }
 );
 
-UX_STEP_TIMEOUT(
-    ux_signing_step_1,
-    pb,
-    1,
-    ux_unit_test_flow_2,
-    {
-        &C_icon_processing,
-        "Unit tests...",
-    });
+UX_FLOW(
+    ux_sign_tx_done_flow,
+    &ux_sign_tx_done_flow_done_step
+);
 
-UX_FLOW(ux_unit_test_flow_1,
-        &ux_signing_step_1);
+#ifdef HAVE_ON_DEVICE_UNIT_TESTS
+    UX_STEP_TIMEOUT(
+        ux_sign_tx_flow_unit_tests_step,
+        pb,
+        1,
+        ux_sign_tx_done_flow,
+        {
+            &C_icon_processing,
+            "Unit tests..."
+        }
+    );
+
+    UX_FLOW(
+        ux_sign_tx_unit_test_flow,
+        &ux_sign_tx_flow_unit_tests_step
+    );
+#else
+    UX_STEP_TIMEOUT(
+        ux_sign_tx_comfort_flow_signing_step,
+        pb,
+        1,
+        ux_sign_tx_done_flow,
+        {
+            &C_icon_processing,
+            "Signing..."
+        }
+    );
+
+    UX_FLOW(
+        ux_sign_tx_comfort_flow,
+        &ux_sign_tx_comfort_flow_signing_step
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_topic_step,
+        pnn,
+        {
+            &C_icon_eye,
+            "Sign",
+            "Transaction"
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_network_step,
+        bn,
+        {
+            "Network",
+            "testnet"
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_type_step,
+        bn,
+        {
+            "Type",
+            _ui.type
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_from_step,
+        bnnn_paging,
+        {
+            .title = _ui.from_title,
+            .text = _ui.from
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_to_step,
+        bnnn_paging,
+        {
+            .title = _ui.to_title,
+            .text = _ui.to
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_amount_step,
+        bn,
+        {
+            .line1 = "Amount",
+            .line2 = _ui.amount
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_fee_step,
+        bn,
+        {
+           "Fee",
+           _ui.fee
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_total_step,
+        bn,
+        {
+            "Total",
+            _ui.total
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_nonce_step,
+        bn,
+        {
+            "Nonce",
+            _ui.nonce
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_valid_until_step,
+        bn,
+        {
+            "Valid until",
+            _ui.valid_until
+        }
+    );
+
+    UX_STEP_NOCB(
+        ux_sign_tx_flow_memo_step,
+        bnnn_paging,
+        {
+            .title = "Memo",
+            .text = _ui.memo
+        }
+    );
+
+    UX_STEP_VALID(
+        ux_sign_tx_flow_approve_step,
+        pb,
+        ux_flow_init(0, ux_sign_tx_comfort_flow, NULL);,
+        {
+            &C_icon_validate_14,
+            "Approve"
+        }
+    );
+
+    UX_STEP_VALID(
+        ux_sign_tx_flow_reject_step,
+        pb,
+        sendResponse(0, false),
+        {
+            &C_icon_crossmark,
+            "Reject"
+        }
+    );
+
+    // Unfortunately ux flows cannot be generated dynamically
+    // so we must define 16 static flows...
+
+    UX_FLOW(ux_sign_tx_flow_testnet_payment_0_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_payment_0_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_payment_valid_until_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_payment_valid_until_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_delegation_0_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_delegation_0_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_delegation_valid_until_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_testnet_delegation_valid_until_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_network_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_payment_0_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_payment_0_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_payment_valid_until_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_payment_valid_until_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_amount_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_total_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_delegation_0_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_delegation_0_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_delegation_valid_until_0,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    UX_FLOW(ux_sign_tx_flow_mainnet_delegation_valid_until_memo,
+            &ux_sign_tx_flow_topic_step,
+            &ux_sign_tx_flow_type_step,
+            &ux_sign_tx_flow_from_step,
+            &ux_sign_tx_flow_to_step,
+            &ux_sign_tx_flow_fee_step,
+            &ux_sign_tx_flow_nonce_step,
+            &ux_sign_tx_flow_valid_until_step,
+            &ux_sign_tx_flow_memo_step,
+            &ux_sign_tx_flow_approve_step,
+            &ux_sign_tx_flow_reject_step);
+
+    // Create an ux flow index to simplify application logic
+    //
+    #define GET_FLOW_PTR(x) ((const ux_flow_step_t** const )&x)
+    //
+    //     n - network_id       (0 testnet, 1 mainnet)
+    //     t - transaction type (0 payment, 1 delegation)
+    //     v - valid_until      (0 omitted, 1 present)
+    //     m - memo             (0 omitted, 1 present)
+    //                                                  n  t  v  m
+    static const ux_flow_step_t** const ux_sign_tx_flow[2][2][2][2] = {
+        { // testnet
+            { // payment
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_payment_0_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_payment_0_memo)
+                },
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_payment_valid_until_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_payment_valid_until_memo)
+                }
+            },
+            { // delegation
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_delegation_0_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_delegation_0_memo)
+                },
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_delegation_valid_until_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_testnet_delegation_valid_until_memo)
+                }
+            }
+        },
+        { // mainnet
+            { // payment
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_payment_0_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_payment_0_memo)
+                },
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_payment_valid_until_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_payment_valid_until_memo)
+                }
+            },
+            { // delegation
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_delegation_0_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_delegation_0_memo)
+                },
+                {
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_delegation_valid_until_0),
+                    GET_FLOW_PTR(ux_sign_tx_flow_mainnet_delegation_valid_until_memo)
+                }
+            }
+        }
+    };
 #endif
 
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
@@ -321,33 +514,31 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     UNUSED(p1);
     UNUSED(p2);
 
-    if (dataLength != 171) {
+    if (dataLength != 172) {
         THROW(INVALID_PARAMETER);
     }
 
-    _sig_hex[0] = '\0';
-
-    // 0-3: sender_bip44_account
+    // 0-3: from_bip44_account
     _account = read_uint32_be(dataBuffer);
 
-    // 4-58: sender_address
-    os_memcpy(_ui.sender, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
-    _ui.sender[MINA_ADDRESS_LEN - 1] = '\0';
-    if (!validate_address(_ui.sender)) {
+    // 4-58: from_address
+    os_memcpy(_ui.from, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
+    _ui.from[MINA_ADDRESS_LEN - 1] = '\0';
+    if (!validate_address(_ui.from)) {
         THROW(INVALID_PARAMETER);
     }
-    read_public_key_compressed(&_tx.source_pk, _ui.sender);
+    read_public_key_compressed(&_tx.source_pk, _ui.from);
 
-    // Always the same as sender for sent-payment and delegate txs
-    read_public_key_compressed(&_tx.fee_payer_pk, _ui.sender);
+    // Always the same as from for sent-payment and delegate txs
+    read_public_key_compressed(&_tx.fee_payer_pk, _ui.from);
 
-    // 59-113: receiver
-    os_memcpy(_ui.receiver, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
-    _ui.receiver[MINA_ADDRESS_LEN - 1] = '\0';
-    if (!validate_address(_ui.receiver)) {
+    // 59-113: to
+    os_memcpy(_ui.to, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
+    _ui.to[MINA_ADDRESS_LEN - 1] = '\0';
+    if (!validate_address(_ui.to)) {
         THROW(INVALID_PARAMETER);
     }
-    read_public_key_compressed(&_tx.receiver_pk, _ui.receiver);
+    read_public_key_compressed(&_tx.receiver_pk, _ui.to);
 
     // 114-121: amount
     _tx.amount = read_uint64_be(dataBuffer + 114);
@@ -388,63 +579,42 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
 
     // 170: tag
     uint8_t tag = *(dataBuffer + 170);
-    if (tag != 0x00 && tag != 0x04) {
+    if (tag != PAYMENT_TX && tag != DELEGATION_TX) {
         THROW(INVALID_PARAMETER);
     }
     _tx.tag[0] = tag & 0x01;
     _tx.tag[1] = tag & 0x02;
     _tx.tag[2] = tag & 0x04;
 
-    #ifdef ON_DEVICE_UNIT_TESTS
-    ux_flow_init(0, ux_unit_test_flow_1, NULL);
-    *flags |= IO_ASYNCH_REPLY;
-    return;
+    // 171: network_id
+    _network_id = *(dataBuffer + 171);
+    if (_network_id != TESTNET_ID && _network_id != MAINNET_ID) {
+        THROW(INVALID_PARAMETER);
+    }
+
+    #ifdef HAVE_ON_DEVICE_UNIT_TESTS
+        ux_flow_init(0, ux_sign_tx_unit_test_flow, NULL);
+    #else
+        if (tag == PAYMENT_TX) {
+            strncpy(_ui.type, "Payment", sizeof(_ui.type));
+            strncpy(_ui.from_title, "Sender", sizeof(_ui.from_title));
+            strncpy(_ui.to_title, "Receiver", sizeof(_ui.to_title));
+        }
+        else if (tag == DELEGATION_TX) {
+            strncpy(_ui.type, "Delegation", sizeof(_ui.type));
+            strncpy(_ui.from_title, "Delegator", sizeof(_ui.from_title));
+            strncpy(_ui.to_title, "Delegate", sizeof(_ui.to_title));
+        }
+
+        // Select the appropriate UX flow
+        int n_idx = _network_id == MAINNET_ID;
+        int t_idx = tag == DELEGATION_TX;
+        int v_idx = _tx.valid_until != (uint32_t)-1;
+        int m_idx = _ui.memo[0] != '\0';
+
+        // Run the UX flow
+        ux_flow_init(0, ux_sign_tx_flow[n_idx][t_idx][v_idx][m_idx], NULL);
     #endif
-
-    if (tag == 0x00) {
-        strncpy(_ui.type, "Payment", sizeof(_ui.type));
-        strncpy(_ui.sender_title, "Sender", sizeof(_ui.sender_title));
-        strncpy(_ui.receiver_title, "Receiver", sizeof(_ui.receiver_title));
-
-        if (_tx.valid_until == (uint32_t)-1 && _ui.memo[0] == '\0') {
-            // Valid forever and no memo
-            ux_flow_init(0, ux_sign_payment_tx_flow, NULL);
-        }
-        else if (_ui.memo[0] == '\0') {
-            // Valid until and no memo
-            ux_flow_init(0, ux_sign_payment_tx_flow_valid_until, NULL);
-        }
-        else if (_tx.valid_until == (uint32_t)-1) {
-            // Valid forever and memo
-            ux_flow_init(0, ux_sign_payment_tx_flow_memo, NULL);
-        }
-        else {
-            // Valid until and memo
-            ux_flow_init(0, ux_sign_payment_tx_flow_all, NULL);
-        }
-    }
-    else if (tag == 0x04) {
-        strncpy(_ui.type, "Delegation", sizeof(_ui.type));
-        strncpy(_ui.sender_title, "Delegator", sizeof(_ui.sender_title));
-        strncpy(_ui.receiver_title, "Delegate", sizeof(_ui.receiver_title));
-
-        if (_tx.valid_until == (uint32_t)-1 && _ui.memo[0] == '\0') {
-            // Valid forever and no memo
-            ux_flow_init(0, ux_sign_delegate_tx_flow, NULL);
-        }
-        else if (_ui.memo[0] == '\0') {
-            // Valid until and no memo
-            ux_flow_init(0, ux_sign_delegate_tx_flow_valid_until, NULL);
-        }
-        else if (_tx.valid_until == (uint32_t)-1) {
-            // Valid forever and memo
-            ux_flow_init(0, ux_sign_delegate_tx_flow_memo, NULL);
-        }
-        else {
-            // Valid until and memo
-            ux_flow_init(0, ux_sign_delegate_tx_flow_all, NULL);
-        }
-    }
 
     *flags |= IO_ASYNCH_REPLY;
 }

@@ -27,7 +27,7 @@ UX_STEP_NOCB_INIT(
 UX_FLOW(ux_test_crypto_done_flow,
         &ux_test_crypto_done_flow_step);
 
-#ifdef ON_DEVICE_UNIT_TESTS
+#ifdef HAVE_ON_DEVICE_UNIT_TESTS
 
 UX_STEP_TIMEOUT(
     ux_test_crypto_testing_step,

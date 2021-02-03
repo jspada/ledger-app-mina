@@ -16,6 +16,8 @@ MINA_URL = "http://localhost:3087"
 NETWORK = "debug"
 VERBOSE = False
 
+TESTNET_ID         = 0x00
+MAINNET_ID         = 0x01
 TX_TYPE_PAYMENT    = 0x00
 TX_TYPE_DELEGATION = 0x04
 MAX_ACCOUNT_NUM    = ctypes.c_uint32(-1).value
@@ -122,6 +124,7 @@ if __name__ == "__main__":
     test_transaction_parser.add_argument('account_number', type=valid_account, help='BIP44 account generate test transaction with. e.g. 42.')
     test_transaction_parser.add_argument('account_address', type=valid_address("Account"), help='Mina address corresponding to BIP44 account')
     test_transaction_parser.add_argument('--interactive', default=False, action="store_true", help='Interactive mode')
+    test_transaction_parser.add_argument('--network', help='Network override')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -590,7 +593,7 @@ def ledger_get_address(account):
 
     return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
 
-def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee, nonce, valid_until, memo):
+def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee, nonce, valid_until, memo, network_id):
     sender_bip44_account = '{:08x}'.format(int(sender_account))
     sender_address = sender_address.encode().hex()
     receiver = receiver.encode().hex()
@@ -600,6 +603,7 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
     valid_until = '{:08x}'.format(valid_until)
     memo = memo.ljust(MAX_MEMO_LEN, '\x00')[:MAX_MEMO_LEN].encode().hex()
     tag = '{:02x}'.format(tx_type)
+    network_id = '{:02x}'.format(network_id)
 
     total_len = len(sender_bip44_account) \
                 + len(sender_address) \
@@ -609,7 +613,8 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
                 + len(nonce) \
                 + len(valid_until) \
                 + len(memo) \
-                + len(tag)
+                + len(tag) \
+                + len(network_id)
 
     # Create APDU message.
     #     CLA 0xe0 CLA
@@ -625,13 +630,14 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
                   + nonce \
                   + valid_until \
                   + memo \
-                  + tag
+                  + tag \
+                  + network_id
 
     if VERBOSE:
         print("\napduMessage hex ({}) = {}\n".format(total_len + 4, apduMessage))
 
     apdu = bytearray.fromhex(apduMessage)
-    return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
+    return DONGLE.exchange(apdu).hex()
 
 def print_cstruct(str):
     revbytes = bytes.fromhex(str)[::-1]
@@ -658,6 +664,12 @@ def tx_type_from_op(op):
     elif op == "delegate":
         return TX_TYPE_DELEGATION
 
+def network_id_from_string(network_str):
+    if network_str == "mainnet" or network_str.startswith("mainnet-"):
+        return MAINNET_ID
+    else:
+        return TESTNET_ID
+
 def check_tx(tx_type, tx, sender, receiver, amount, fee, valid_until, nonce, memo):
     def common_tx_check(tx, fee, valid_until, nonce, memo):
         return tx["fee"] == str(fee) and \
@@ -678,7 +690,7 @@ def check_tx(tx_type, tx, sender, receiver, amount, fee, valid_until, nonce, mem
                tx["new_delegate"] == receiver and \
                common_tx_check(tx, fee, valid_until, nonce, memo)
 
-__all__ = [TX_TYPE_PAYMENT, TX_TYPE_DELEGATION, ledger_init, ledger_get_address, ledger_sign_tx]
+__all__ = [TESTNET_ID, MAINNET_ID, TX_TYPE_PAYMENT, TX_TYPE_DELEGATION, ledger_init, ledger_get_address, ledger_sign_tx]
 
 if __name__ == "__main__":
     try:
@@ -779,6 +791,8 @@ if __name__ == "__main__":
 
             print()
             print("Sign transaction:")
+            if network_id_from_string(NETWORK) == TESTNET_ID:
+                print("    Network:     testnet")
             print("    Type:        {}".format(tx_type_name(args.operation)))
             print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
@@ -858,7 +872,8 @@ if __name__ == "__main__":
                                        fee,
                                        nonce,
                                        valid_until,
-                                       memo)
+                                       memo,
+                                       network_id_from_string(NETWORK))
             print("done", flush=True)
 
             if VERBOSE:
@@ -898,6 +913,8 @@ if __name__ == "__main__":
 
             print()
             print("Send transaction:")
+            if network_id_from_string(NETWORK) == TESTNET_ID:
+                print("    Network:     testnet")
             print("    Type:        {}".format(tx_type_name(args.operation)))
             print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
@@ -946,12 +963,17 @@ if __name__ == "__main__":
             address = args.account_address
             memo = os.urandom(16).hex()
 
+            if args.network is not None:
+                NETWORK = args.network
+
             if len(memo) != 32:
                 raise Exception("Failed to get memo entropy")
 
             if args.interactive:
                 print()
                 print("Generate test transaction:")
+                if network_id_from_string(NETWORK) == TESTNET_ID:
+                    print("    Network:     testnet")
                 print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
                 print("    Address:     {}".format(address))
                 print()
@@ -971,7 +993,8 @@ if __name__ == "__main__":
                                        0,
                                        0,
                                        0,
-                                       memo)
+                                       memo,
+                                       network_id_from_string(NETWORK))
             if args.interactive:
                 print("done")
 

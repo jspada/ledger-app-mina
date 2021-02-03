@@ -2,14 +2,14 @@
     "version": 1,
     "rules": [
         {
-            "regexp": "(Address|Type|Sender|Receive|Delegator|Delegate|Amount|Fee|Total|Nonce|Valid until|Memo).*",
+            "regexp": "(Address|Transaction|Path|Network|Type|Sender|Receive|Delegator|Delegate|Amount|Fee|Total|Nonce|Valid until|Memo).*",
             "actions": [
                 [ "button", 2, true ],
                 [ "button", 2, false ]
             ]
         },
         {
-            "regexp": "Approve",
+            "regexp": "(Approve|Generate)",
             "actions": [
                 [ "button", 1, true ],
                 [ "button", 2, true ],

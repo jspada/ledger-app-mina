@@ -169,10 +169,10 @@ int roinput_to_fields(Field *out, size_t len, const ROInput *input)
     return output_len;
 }
 
-int roinput_derive_message(uint8_t *out, size_t len, const Keypair *kp, const ROInput *msg)
+int roinput_derive_message(uint8_t *out, const size_t len, const Keypair *kp, const ROInput *msg, const uint8_t network_id)
 {
     Field   input_fields[msg->fields_capacity + 2];
-    uint8_t input_bits[msg->bits_capacity + SCALAR_BYTES];
+    uint8_t input_bits[msg->bits_capacity + SCALAR_BYTES + 1];
     ROInput input = roinput_create(input_fields, input_bits);
 
     if (msg->fields_len > input.fields_capacity) {
@@ -190,23 +190,20 @@ int roinput_derive_message(uint8_t *out, size_t len, const Keypair *kp, const RO
     roinput_add_field(&input, kp->pub.x);
     roinput_add_field(&input, kp->pub.y);
     roinput_add_scalar(&input, kp->priv); // Secret is now on stack!
+    roinput_add_bytes(&input, &network_id, 1);
 
-    size_t input_size_in_bits = input.bits_len + FIELD_BITS * input.fields_len;
-    size_t input_size_in_bytes = (input_size_in_bits + 7) / 8;
-    if (input_size_in_bytes > len) {
-        // Clear privkey material
-        explicit_bzero(&input_bits, sizeof(input_bits));
-        return -1;
+    size_t input_size_in_bytes = (input.bits_len + FIELD_BITS * input.fields_len + 7) / 8;
+    if (input_size_in_bytes <= len) {
+        roinput_to_bytes(out, &input);
     }
-    roinput_to_bytes(out, &input);
 
     // Clear privkey material
     explicit_bzero(&input_bits, sizeof(input_bits));
 
-    return input_size_in_bytes;
+    return input_size_in_bytes > len ? -1 : input_size_in_bytes;
 }
 
-int roinput_hash_message(Field *out, size_t len, const Affine *pub, const Field rx, const ROInput *msg)
+int roinput_hash_message(Field *out, const size_t len, const Affine *pub, const Field rx, const ROInput *msg)
 {
     Field   input_fields[msg->fields_capacity + 3];
     uint8_t input_bits[msg->bits_capacity];

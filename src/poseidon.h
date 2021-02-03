@@ -23,5 +23,6 @@
 
 typedef Field State[SPONGE_SIZE];
 
-void poseidon_update(State s, const Scalar *input, size_t len);
+void poseidon_init(State s, const uint8_t network_id);
+void poseidon_update(State s, const Scalar *input, const size_t len);
 void poseidon_digest(Scalar out, const State s);

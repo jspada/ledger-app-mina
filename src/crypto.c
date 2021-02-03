@@ -180,15 +180,13 @@ bool field_is_odd(const Field y)
     return y[FIELD_BYTES - 1] & 0x01;
 }
 
-void scalar_from_bytes(Scalar a, const uint8_t *bytes, size_t len)
+void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len)
 {
     if (len != SCALAR_BYTES) {
         THROW(INVALID_PARAMETER);
     }
 
-    if (a != bytes) {
-        os_memcpy(a, bytes, SCALAR_BYTES);
-    }
+    os_memmove(a, bytes, SCALAR_BYTES);
 
     // Make sure the scalar is in [0, p)
     //
@@ -503,7 +501,7 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key)
     affine_scalar_mul(pub_key, priv_key, &AFFINE_ONE);
 }
 
-void generate_keypair(Keypair *keypair, uint32_t account)
+void generate_keypair(Keypair *keypair, const uint32_t account)
 {
     if (!keypair) {
         THROW(INVALID_PARAMETER);
@@ -597,10 +595,10 @@ bool validate_address(const char *address)
     return os_memcmp(raw->checksum, hash2, 4) == 0;
 }
 
-void message_derive(Scalar out, const Keypair *kp, const ROInput *input)
+void message_derive(Scalar out, const Keypair *kp, const ROInput *input, const uint8_t network_id)
 {
-    uint8_t derive_msg[267] = { };
-    int derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input);
+    uint8_t derive_msg[268] = { };
+    int derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input, network_id);
     if (derive_len < 0) {
         THROW(INVALID_PARAMETER);
     }
@@ -623,42 +621,22 @@ void message_derive(Scalar out, const Keypair *kp, const ROInput *input)
     scalar_from_bytes(out, out, SCALAR_BYTES);
 }
 
-void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input)
+void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input, const uint8_t network_id)
 {
     Field hash_msg[9];
-    int hash_msg_len = roinput_hash_message(hash_msg, sizeof(hash_msg),
-                                               pub, rx, input);
+    int hash_msg_len = roinput_hash_message(hash_msg, sizeof(hash_msg), pub, rx, input);
     if (hash_msg_len < 0) {
         THROW(INVALID_PARAMETER);
     }
 
     // Initial sponge state
-    State pos = {
-        {
-            0x3e, 0x32, 0x37, 0x18, 0xb3, 0xfe, 0x2a, 0x3d,
-            0x6a, 0x27, 0x89, 0x07, 0xaf, 0xa2, 0xa9, 0xfc,
-            0x7d, 0x17, 0x93, 0x3d, 0x1e, 0xf7, 0xc6, 0x65,
-            0x50, 0x07, 0xb9, 0x62, 0xb8, 0xc8, 0x53, 0x92
-        },
-        {
-            0x37, 0x0a, 0x1c, 0x8b, 0x48, 0x37, 0x40, 0xa5,
-            0xcc, 0xe5, 0xc5, 0x0c, 0x92, 0xcb, 0x64, 0xb9,
-            0x64, 0xaf, 0x7d, 0x48, 0xa0, 0x24, 0x8c, 0x54,
-            0xd1, 0x03, 0x2c, 0x6a, 0x3d, 0xe4, 0x4e, 0x99
-        },
-        {
-            0x07, 0x1c, 0x33, 0x03, 0xf0, 0x2d, 0x91, 0x1a,
-            0xff, 0xae, 0xfb, 0x48, 0x9e, 0x71, 0x4b, 0x51,
-            0xd7, 0xe1, 0x8e, 0x31, 0xb3, 0x2d, 0x83, 0x9c,
-            0xfd, 0x3d, 0x55, 0x33, 0x46, 0xc1, 0x0d, 0x36
-        }
-    };
-
+    State pos;
+    poseidon_init(pos, network_id);
     poseidon_update(pos, hash_msg, hash_msg_len);
     poseidon_digest(out, pos);
 }
 
-void sign(Signature *sig, const Keypair *kp, const ROInput *input)
+void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id)
 {
     Scalar k;
     Affine r;
@@ -667,7 +645,7 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input)
     BEGIN_TRY {
         TRY {
             // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
-            message_derive(k, kp, input);
+            message_derive(k, kp, input, network_id);
 
             // r = k*g
             affine_scalar_mul(&r, k, &AFFINE_ONE);
@@ -680,7 +658,7 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input)
             }
 
             // e = message_hash(input + kp.pub + r.x)
-            message_hash(sig->s, &kp->pub, r.x, input);
+            message_hash(sig->s, &kp->pub, r.x, input, network_id);
 
             // s = k + e*sk
             scalar_mul(tmp, sig->s, kp->priv);

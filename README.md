@@ -88,7 +88,7 @@ course grief vintage slim tell hospital car maze model style elegant kitchen sta
 
 ```bash
 make clean
-make USER_DEFINES=ON_DEVICE_UNIT_TESTS load
+ON_DEVICE_UNIT_TESTS=1 make load
 ```
 
 3. Start the unit tests app on your Ledger device

@@ -16,7 +16,7 @@
 #*******************************************************************************
 
 ifeq ($(BOLOS_SDK),)
-$(error Environment variable BOLOS_SDK is not set)
+$(error Environment variable BOLOS_SDK is not set (source ./prepare-devenv.sh))
 endif
 include $(BOLOS_SDK)/Makefile.defines
 
@@ -47,6 +47,77 @@ all: default stop_emulator test
 # Platform #
 ############
 
+# Set DEFINES and convenience helper based on environmental flags
+ifneq ("$(RELEASE_BUILD)","")
+RELEASE_BUILD=1
+else
+ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c release),0)
+RELEASE_BUILD=1
+else
+RELEASE_BUILD=0
+endif
+endif
+
+ifneq ("$(ON_DEVICE_UNIT_TESTS)","")
+DEFINES   += HAVE_ON_DEVICE_UNIT_TESTS
+ON_DEVICE_UNIT_TESTS=1
+else
+ON_DEVICE_UNIT_TESTS=0
+endif
+
+ifeq ("$(NO_STACK_CANARY)","")
+ifeq ($(RELEASE_BUILD),0)
+DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
+STACK_CANARY=1
+else
+STACK_CANARY=0
+endif
+else
+STACK_CANARY=0
+endif
+
+ifeq ("$(NO_EMULATOR)","")
+EMULATOR=1
+else
+EMULATOR=0
+endif
+
+ifeq ("$(NO_EMULATOR_TESTS)","")
+EMULATOR_TESTS=1
+else
+EMULATOR_TESTS=0
+endif
+
+ifneq ("$(AUTOMATION)","")
+AUTOMATION=1
+else
+AUTOMATION=0
+endif
+
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+EMULATOR_MODEL=nanox
+endif
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+EMULATOR_MODEL=nanos
+endif
+
+ifeq ("$(EMULATOR_MODEL)","")
+$(error Unknown TARGET_NAME '$(TARGET_NAME)')
+endif
+
+# Make environmental flags consistent with DEFINES
+ifneq ($(shell echo $(DEFINES) | grep -c HAVE_ON_DEVICE_UNIT_TESTS), 0)
+ON_DEVICE_UNIT_TESTS=1
+else
+ON_DEVICE_UNIT_TESTS=0
+endif
+ifeq ($(shell echo $(DEFINES) | grep -c HAVE_BOLOS_APP_STACK_CANARY), 0)
+NO_STACK_CANARY=0
+else
+NO_STACK_CANARY=1
+endif
+
 DEFINES   += LEDGER_BUILD
 DEFINES   += OS_IO_SEPROXYHAL
 DEFINES   += HAVE_BAGL HAVE_SPRINTF
@@ -64,7 +135,6 @@ DEFINES       += HAVE_WEBUSB WEBUSB_URL_SIZE_B=$(shell echo -n $(WEBUSB_URL) | w
 
 DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
-
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 DEFINES   	  += IO_SEPROXYHAL_BUFFER_SIZE_B=300
@@ -95,6 +165,55 @@ ifneq ($(DEBUG),0)
         endif
 else
         DEFINES   += PRINTF\(...\)=
+endif
+
+ifneq ("$(MAKECMDGOALS)", "clean")
+ifneq ("$(MAKECMDGOALS)", "allclean")
+$(info )
+$(info ================)
+$(info Build parameters)
+$(info ================)
+$(info TARGETS              $(MAKECMDGOALS))
+$(info RELEASE_BUILD        $(RELEASE_BUILD))
+$(info TARGET_NAME          $(TARGET_NAME))
+$(info EMULATOR             $(EMULATOR))
+$(info EMULATOR_MODEL       $(EMULATOR_MODEL))
+$(info EMULATOR_TESTS       $(EMULATOR_TESTS))
+$(info AUTOMATION           $(AUTOMATION))
+$(info ON_DEVICE_UNIT_TESTS $(ON_DEVICE_UNIT_TESTS))
+$(info STACK_CANARY         $(STACK_CANARY))
+$(info )
+endif
+endif
+
+ifeq ($(RELEASE_BUILD),1)
+ifneq ($(shell echo $(DEFINES) | grep -c HAVE_BOLOS_APP_STACK_CANARY),0)
+$(error HAVE_BOLOS_APP_STACK_CANARY should not be used for release builds);
+endif
+ifneq ($(shell echo $(DEFINES) | grep -c HAVE_ON_DEVICE_UNIT_TESTS),0)
+$(error HAVE_ON_DEVICE_UNIT_TESTS should not be used for release builds);
+endif
+ifeq ($(EMULATOR),0)
+$(error NO_EMULATOR should not be used for release builds);
+endif
+ifeq ($(EMULATOR_TESTS),0)
+$(error NO_EMULATOR_TESTS should not be used for release builds);
+endif
+endif
+
+ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c release),0)
+ifneq ($(shell echo $(DEFINES) | grep -c HAVE_BOLOS_APP_STACK_CANARY),0)
+$(error HAVE_BOLOS_APP_STACK_CANARY should not be used for release builds);
+endif
+ifneq ($(shell echo $(DEFINES) | grep -c HAVE_ON_DEVICE_UNIT_TESTS),0)
+$(error HAVE_ON_DEVICE_UNIT_TESTS should not be used for release builds);
+endif
+ifeq ($(EMULATOR),0)
+$(error NO_EMULATOR should not be used for release builds);
+endif
+ifeq ($(EMULATOR_TESTS),0)
+$(error NO_EMULATOR_TESTS should not be used for release builds);
+endif
 endif
 
 ##############
@@ -139,62 +258,6 @@ endif
 APP_LOAD_PARAMS_EVALUATED=$(shell printf '\\"%s\\" ' $(APP_LOAD_PARAMS))
 APP_DELETE_PARAMS_EVALUATED=$(shell printf '\\"%s\\" ' $(COMMON_DELETE_PARAMS))
 
-load: all
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
-
-load-offline: all
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
-
-delete:
-	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
-
-dev-env/speculos/build/src/launcher: dev-env/speculos
-ifeq ("$(NO_EMULATOR)","")
-	cd $<; cmake -Bbuild -H.
-	$(MAKE) -C $</build
-endif
-
-ifneq (,$(wildcard emulator.pid))
-EMULATOR_PID=`cat ./emulator.pid`
-endif
-stop_emulator:
-ifneq (,$(wildcard emulator.pid))
-	@echo "Stopping emulator with PID $(EMULATOR_PID)"
-	@kill $(EMULATOR_PID) >/dev/null 2>&1 || true
-	rm -f ./emulator.pid
-endif
-
-test:
-	$(MAKE) -C tests
-
-TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
-              elegant kitchen state purpose matrix gas grid enable frown road \
-              goddess glove canyon key
-
-ifeq ("$(NO_EMULATOR)","")
-ifeq (,$(wildcard ./dev-env/speculos/CMakeLists.txt))
-$(error Submodules missing: use 'git submodule update --init --recursive' or set NO_EMULATOR=1.)
-endif
-endif
-
-ifneq ("$(AUTOMATION)","")
-EMULATOR_AUTOMATION=--automation file:./emulator_automation.json
-else
-EMULATOR_AUTOMATION=
-endif
-
-run: all dev-env/speculos/build/src/launcher
-	@if [ -z $(NO_EMULATOR) ]; then \
-	    echo "Running emulator" ; \
-	    ./dev-env/speculos/speculos.py --ontop $(EMULATOR_AUTOMATION) \
-	                       -s "$(TEST_MNEMONIC)" \
-	                       ./bin/app.elf > emulator.log 2>&1 & \
-	    echo $$! > emulator.pid || exit 211; \
-	else \
-	echo "Error: cannot run emulator with NO_EMULATOR environmental variable set"; \
-	    exit 1; \
-	fi
-
 define RELEASE_README
 ledger-app-mina-$(VERSION_TAG)
 
@@ -224,7 +287,26 @@ read -p "Please unlock your Ledger device and exit any apps (press any key to co
 endef
 export RELEASE_DEPS
 
-release: clean all
+release:
+	@# Must force clean like this because Ledger makefile always runs first
+	@echo
+	@echo "RELEASE BUILD: Forcing clean"
+	@echo
+	$(MAKE) clean
+
+	@# Make sure unit tests are run with stack canary
+	@echo
+	@echo "RELEASE BUILD: Building with HAVE_BOLOS_APP_STACK_CANARY for unit tests"
+	@echo
+	@NO_STACK_CANARY= NO_EMULATOR= NO_EMULATOR_TEST= ON_DEVICE_UNIT_TESTS= $(MAKE) all
+
+	@# Build release without stack canary
+	@$(MAKE) clean
+	@echo
+	@echo "RELEASE BUILD: Building without HAVE_BOLOS_APP_STACK_CANARY"
+	@echo
+	@RELEASE_BUILD=1 NO_STACK_CANARY=1 $(MAKE) all
+
 	@echo "Packaging release... ledger-app-mina-$(VERSION_TAG).tar.gz"
 
 	@echo "$$RELEASE_README" > README.txt
@@ -256,6 +338,65 @@ release: clean all
 	@rm -f uninstall.sh
 	@rm -f mina_ledger_wallet
 
+load: all
+	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+
+load-offline: all
+	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
+
+delete:
+	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
+
+dev-env/speculos/build/src/launcher: dev-env/speculos
+ifeq ($(EMULATOR),1)
+	cd $<; cmake -Bbuild -H.
+	$(MAKE) -C $</build
+endif
+
+ifneq (,$(wildcard emulator.pid))
+EMULATOR_PID=`cat ./emulator.pid`
+endif
+stop_emulator:
+ifneq (,$(wildcard emulator.pid))
+	@echo "Stopping emulator with PID $(EMULATOR_PID)"
+	@kill $(EMULATOR_PID) >/dev/null 2>&1 || true
+	rm -f ./emulator.pid
+endif
+
+test:
+	$(MAKE) -C tests
+
+TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
+              elegant kitchen state purpose matrix gas grid enable frown road \
+              goddess glove canyon key
+
+ifeq ($(EMULATOR),1)
+ifeq (,$(wildcard ./dev-env/speculos/CMakeLists.txt))
+$(error Submodules missing: use 'git submodule update --init --recursive' or set NO_EMULATOR=1.)
+endif
+endif
+
+ifeq ($(AUTOMATION),1)
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+$(error Emulator automation is not supported on the Nano X)
+endif
+EMULATOR_AUTOMATION=--automation file:./emulator_automation.json
+else
+EMULATOR_AUTOMATION=
+endif
+
+run: all dev-env/speculos/build/src/launcher
+	@if [ $(EMULATOR) -eq 1 ]; then \
+	    echo "Running $(EMULATOR_MODEL) emulator" ; \
+	    ./dev-env/speculos/speculos.py -m $(EMULATOR_MODEL) --ontop $(EMULATOR_AUTOMATION) \
+	                       -s "$(TEST_MNEMONIC)" \
+	                       ./bin/app.elf > emulator.log 2>&1 & \
+	    echo $$! > emulator.pid || exit 211; \
+	else \
+	    echo "Error: cannot run emulator with NO_EMULATOR environmental variable set"; \
+	    exit 1; \
+	fi
+
 # import generic rules from the sdk
 include $(BOLOS_SDK)/Makefile.rules
 
@@ -264,7 +405,7 @@ dep/%.d: %.c Makefile
 
 allclean: clean
 	$(MAKE) --directory=tests clean
-	rm -rf dev-env/speculos/build
+	rm -rf dev-env/speculos/build ledger-app-mina-*.{tar.gz,zip}
 
 listvariants:
 	@echo VARIANTS COIN mina
