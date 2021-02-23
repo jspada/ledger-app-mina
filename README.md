@@ -150,7 +150,7 @@ Getting account balance... done
 Address: B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt
 Balance: 9792.0
 ```
-This queries the Mina blockchain for the balance of address `B62qrGaXh9wekfwaA2yzUbhbvFYynkmBkhYLV36dvy5AkRvgeQnY6vx`.
+This queries the Mina blockchain for the balance of address `B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt`.
 
 **Send payment**
 
