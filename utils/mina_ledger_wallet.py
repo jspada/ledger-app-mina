@@ -82,9 +82,10 @@ def valid_valid_until(valid_until):
     try:
         value = int(valid_until)
         if value is None or value > MAX_VALID_UNTIL:
-            raise argparse.ArgumentTypeError("Must be at most {}".format(MAX_VALID_UNTIL))
+            raise
     except:
-        return value
+        raise argparse.ArgumentTypeError("Must be at most {}".format(MAX_VALID_UNTIL))
+    return value
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -110,6 +111,7 @@ if __name__ == "__main__":
     send_payment_parser.add_argument('--nonce', type=valid_nonce, help='Nonce override')
     send_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     send_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
+    send_payment_parser.add_argument('--offline', default=False, action="store_true", help='Offline mode')
     delegate_payment_parser = subparsers.add_parser('delegate')
     delegate_payment_parser.add_argument('delegator_bip44_account', type=valid_account, help='BIP44 account of delegator (e.g. 42)')
     delegate_payment_parser.add_argument('delegator_address', type=valid_address("Delegator"), help='Address of delegator')
@@ -120,6 +122,7 @@ if __name__ == "__main__":
     delegate_payment_parser.add_argument('--nonce', help='Nonce override')
     delegate_payment_parser.add_argument('--valid_until', type=valid_valid_until, help='Valid until')
     delegate_payment_parser.add_argument('--memo', type=valid_memo, help='Transaction memo (publicly visible)')
+    delegate_payment_parser.add_argument('--offline', default=False, action="store_true", help='Offline mode')
     test_transaction_parser = subparsers.add_parser('test-transaction')
     test_transaction_parser.add_argument('account_number', type=valid_account, help='BIP44 account generate test transaction with. e.g. 42.')
     test_transaction_parser.add_argument('account_address', type=valid_address("Account"), help='Mina address corresponding to BIP44 account')
@@ -135,6 +138,9 @@ def rosetta_network_request():
     }""")
 
     # Query
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(network_request))
+
     print("Getting network identifier... ", end="", flush=True)
     network_resp = requests.post(MINA_URL + '/network/list',
                                 data=json.dumps(network_request)).json()
@@ -143,21 +149,24 @@ def rosetta_network_request():
     if "network_identifiers" not in network_resp:
         print("error")
         if VERBOSE:
-            print("\nNETWORK_RESP = {}\n".format(network_resp))
+            print("\nRESPONSE = {}\n".format(network_resp))
         raise Exception("Failed to get network identifiers")
     network_identifiers = network_resp["network_identifiers"]
     if len(network_identifiers) < 1:
         print("error", flush=True)
         if VERBOSE:
-            print("\nNETWORK_RESP = {}\n".format(network_resp))
+            print("\nRESPONSE = {}\n".format(network_resp))
         raise Exception("Empty network identifiers")
     identifier = network_identifiers[0]
     if identifier["blockchain"] != "coda":
         print("error", flush=True)
         if VERBOSE:
-            print("\nNETWORK_RESP = {}\n".format(network_resp))
+            print("\nRESPONSE = {}\n".format(network_resp))
         raise Exception("Invalid blockchain {}".format(identifier["blockchain"]))
     print("{}".format(NETWORK), flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(network_resp))
 
     return identifier["network"]
 
@@ -178,20 +187,26 @@ def rosetta_metadata_request(sender_address):
     construction_metadata_request["network_identifier"]["network"] = NETWORK
     construction_metadata_request["options"]["sender"] = sender_address;
 
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(construction_metadata_request))
+
     print("Getting account nonce and suggested fee... ", end="", flush=True)
     metadata_resp = requests.post(MINA_URL + '/construction/metadata',
                                   data=json.dumps(construction_metadata_request)).json()
     if "metadata" not in metadata_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nMETADATA_RESP = {}\n".format(metadata_resp))
+            print("\nRESPONSE = {}\n".format(metadata_resp))
         raise Exception("Failed to get metadata")
     if "suggested_fee" not in metadata_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nMETADATA_RESP = {}\n".format(metadata_resp))
+            print("\nRESPONSE = {}\n".format(metadata_resp))
         raise Exception("Failed to get suggested fee")
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(metadata_resp))
 
     nonce = int(metadata_resp["metadata"]["nonce"]);
     fee = int(metadata_resp["suggested_fee"][0]["value"])
@@ -219,6 +234,9 @@ def rosetta_balance_request(address):
     account_balance_request["network_identifier"]["network"] = NETWORK
     account_balance_request["account_identifier"]["address"] = address
 
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(account_balance_request))
+
     print("Getting account balance... ", end="", flush=True)
     balance_resp = requests.post(MINA_URL + '/account/balance',
                                 data=json.dumps(account_balance_request)).json()
@@ -226,9 +244,12 @@ def rosetta_balance_request(address):
     if "balances" not in balance_resp:
         print("error")
         if VERBOSE:
-            print("\nBALANCE_RESP = {}\n".format(balance_resp))
+            print("\nRESPONSE = {}\n".format(balance_resp))
         raise Exception("Failed to get balance")
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(balance_resp))
 
     return int(balance_resp["balances"][0]["value"])
 
@@ -333,21 +354,27 @@ def rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce):
     # Nonce
     construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
 
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(construction_payloads_request))
+
     print("Constructing unsigned payment transaction... ", end="", flush=True)
     payloads_resp = requests.post(MINA_URL + '/construction/payloads',
                                   data=json.dumps(construction_payloads_request)).json()
     if "unsigned_transaction" not in payloads_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(payloads_resp))
         raise Exception("Failed to get unsigned transaction")
     payload = json.loads(payloads_resp["unsigned_transaction"])
     if "payment" not in payload or payload["payment"] == None:
         print("error", flush=True)
         if VERBOSE:
-            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(payloads_resp))
         raise Exception("Failed to get payment info")
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(payloads_resp))
 
     return payload, payload["payment"]
 
@@ -419,21 +446,27 @@ def rosetta_delegation_payloads_request(delegator, delegate, fee, nonce):
     # Nonce
     construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
 
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(construction_payloads_request))
+
     print("Constructing unsigned delegate transaction... ", end="", flush=True)
     payloads_resp = requests.post(MINA_URL + '/construction/payloads',
                                   data=json.dumps(construction_payloads_request)).json()
     if "unsigned_transaction" not in payloads_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(payloads_resp))
         raise Exception("Failed to get unsigned transaction")
     payload = json.loads(payloads_resp["unsigned_transaction"])
     if "stakeDelegation" not in payload or payload["stakeDelegation"] == None:
         print("error", flush=True)
         if VERBOSE:
-            print("\nPAYLOADS_RESP = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(payloads_resp))
         raise Exception("Failed to get payment info") # TODO update all this
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(payloads_resp))
 
     return payload, payload["stakeDelegation"]
 
@@ -471,6 +504,9 @@ def rosetta_combine_request(payload, signature, tx_type):
     # Set signature hex_bytes
     construction_combine_request["signatures"][0]["hex_bytes"] = signature
 
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(construction_combine_request))
+
     print("Constructing signed transaction... ", end="", flush=True)
     combine_resp = requests.post(MINA_URL + '/construction/combine',
                                  data=json.dumps(construction_combine_request)).json()
@@ -478,7 +514,7 @@ def rosetta_combine_request(payload, signature, tx_type):
     if "signed_transaction" not in combine_resp:
         print("error")
         if VERBOSE:
-            print("\nCOMBINE_RESP = {}\n".format(combine_resp))
+            print("\nRESPONSE = {}\n".format(combine_resp))
         raise Exception("Failed to construct signed transaction")
     payload = json.loads(combine_resp["signed_transaction"])
 
@@ -486,17 +522,20 @@ def rosetta_combine_request(payload, signature, tx_type):
         if "payment" not in payload or payload["payment"] == None:
             print("error")
             if VERBOSE:
-                print("\nCOMBINE_RESP = {}\n".format(combine_resp))
+                print("\nRESPONSE = {}\n".format(combine_resp))
                 raise Exception("Failed to get payment info")
         signed_tx = payload["payment"]
     else:
         if "stake_delegation" not in payload or payload["stake_delegation"] == None:
             print("error")
             if VERBOSE:
-                print("\nCOMBINE_RESP = {}\n".format(combine_resp))
+                print("\nRESPONSE = {}\n".format(combine_resp))
                 raise Exception("Failed to get stakeDelegation info")
         signed_tx = payload["stake_delegation"]
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(combine_resp))
 
     return payload, signed_tx
 
@@ -512,6 +551,9 @@ def rosetta_submit_request(signed_tx):
     construction_submit_request["network_identifier"]["network"] = NETWORK
     construction_submit_request["signed_transaction"] = json.dumps(signed_tx)
 
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(construction_submit_request))
+
     print("Sending transaction... ", end="", flush=True)
     submit_resp = requests.post(MINA_URL + '/construction/submit',
                                 data=json.dumps(construction_submit_request)).json()
@@ -519,12 +561,15 @@ def rosetta_submit_request(signed_tx):
     if "transaction_identifier" not in submit_resp:
         print("error")
         if VERBOSE:
-            print("\nSUBMIT_RESP = {}\n".format(submit_resp))
+            print("\nRESPONSE = {}\n".format(submit_resp))
         if "code" in submit_resp and "details" in submit_resp:
             raise Exception(submit_resp["details"]["body"][1])
         else:
             raise Exception("Failed to submit transaction")
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(submit_resp))
 
     return submit_resp["transaction_identifier"]["hash"]
 
@@ -539,7 +584,10 @@ def rosetta_parse_request(tx):
 
     construction_parse_request["network_identifier"]["network"] = NETWORK
     construction_parse_request["transaction"] = json.dumps(tx)
-    print(json.dumps(construction_parse_request))
+
+    if VERBOSE:
+        print("\nREQUEST = {}\n".format(construction_parse_request))
+
     print("Checking transaction... ", end="", flush=True)
     parse_resp = requests.post(MINA_URL + '/construction/parse',
                                 data=json.dumps(construction_parse_request)).json()
@@ -547,9 +595,12 @@ def rosetta_parse_request(tx):
     if "operations" not in parse_resp:
         print("error")
         if VERBOSE:
-            print("\nPARSE_RESP = {}\n".format(parse_resp))
+            print("\nRESPONSE = {}\n".format(parse_resp))
         raise Exception("Failed to parse transaction")
     print("done", flush=True)
+
+    if VERBOSE:
+        print("\nRESPONSE = {}\n".format(parse_resp))
 
 def ledger_init():
     global DONGLE
@@ -589,7 +640,7 @@ def ledger_get_address(account):
     apdu = bytearray.fromhex(apduMessage)
 
     if VERBOSE:
-        print("\napduMessage hex ({}) = {}\n".format(total_len + 4, apduMessage))
+        print("\n\napduMessage hex ({}) = {}\n".format(int(len(account)/2), apduMessage))
 
     return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
 
@@ -634,10 +685,41 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
                   + network_id
 
     if VERBOSE:
-        print("\napduMessage hex ({}) = {}\n".format(total_len + 4, apduMessage))
+        print("\n\napduMessage hex ({}) = {}\n".format(int(total_len/2), apduMessage))
 
     apdu = bytearray.fromhex(apduMessage)
     return DONGLE.exchange(apdu).hex()
+
+def print_transaction(operation, account, balance, sender, receiver, amount, fee, nonce, valid_until, memo):
+    if network_id_from_string(NETWORK) == TESTNET_ID:
+        print("    Network:     testnet")
+    print("    Type:        {}".format(tx_type_name(operation)))
+    print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
+
+    if operation == "send-payment":
+        if balance != None:
+            print("    Sender:      {} (balance {})".format(sender, to_currency(balance)))
+        else:
+            print("    Sender:      {}".format(sender))
+        print("    Receiver:    {}".format(receiver))
+        print("    Amount:      {:.9f}".format(to_currency(amount)))
+    else:
+        if balance != None:
+            print("    Delegator:   {} (balance {})".format(sender, to_currency(balance)))
+        else:
+            print("    Delegator:   {}".format(sender))
+        print("    Delegate:    {}".format(receiver))
+
+    print("    Fee:         {:.9f}".format(to_currency(fee)))
+    if operation == "send-payment":
+        print("    Total:       {:.9f}".format(to_currency(amount + fee)))
+    print("    Nonce:       {}".format(nonce))
+
+    if valid_until != "":
+        print("    Valid until: {}".format(valid_until))
+    if memo != "":
+        print("    Memo:        {}".format(memo))
+    print()
 
 def print_cstruct(str):
     revbytes = bytes.fromhex(str)[::-1]
@@ -732,7 +814,7 @@ if __name__ == "__main__":
             print("Balance: {}".format(to_currency(balance)))
             print()
 
-        elif args.operation == "send-payment" or args.operation == "delegate":
+        elif (args.operation == "send-payment" or args.operation == "delegate") and not args.offline:
             ledger_init()
 
             # Set common user supplied parameters
@@ -765,7 +847,7 @@ if __name__ == "__main__":
             NETWORK = rosetta_network_request()
 
             if args.network is not None:
-                # mina url override
+                # mina network override
                 print("Using network override: {}".format(args.network))
                 NETWORK = args.network
 
@@ -791,29 +873,10 @@ if __name__ == "__main__":
 
             print()
             print("Sign transaction:")
-            if network_id_from_string(NETWORK) == TESTNET_ID:
-                print("    Network:     testnet")
-            print("    Type:        {}".format(tx_type_name(args.operation)))
-            print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
-            if args.operation == "send-payment":
-                print("    Sender:      {} (balance {})".format(sender, to_currency(balance)))
-                print("    Receiver:    {}".format(receiver))
-                print("    Amount:      {:.9f}".format(to_currency(amount)))
-            else:
-                print("    Delegator:   {} (balance {})".format(sender, to_currency(balance)))
-                print("    Delegate:    {}".format(receiver))
+            print_transaction(args.operation, account, balance, sender, receiver,
+                              amount, fee, nonce, valid_until, memo)
 
-            print("    Fee:         {:.9f}".format(to_currency(fee)))
-            if args.operation == "send-payment":
-                print("    Total:       {:.9f}".format(to_currency(amount + fee)))
-            print("    Nonce:       {}".format(nonce))
-
-            if valid_until != "":
-                print("    Valid until: {}".format(valid_until))
-            if memo != "":
-                print("    Memo:        {}".format(memo))
-            print()
             if args.operation == "delegate":
                 print("    The entire balance will be delegated.")
                 print()
@@ -913,28 +976,12 @@ if __name__ == "__main__":
 
             print()
             print("Send transaction:")
-            if network_id_from_string(NETWORK) == TESTNET_ID:
-                print("    Network:     testnet")
-            print("    Type:        {}".format(tx_type_name(args.operation)))
-            print("    Account:     {} (path 44'/12586'/\033[4m\033[1m{}\033[0m'/0/0)".format(account, account))
 
-            if args.operation == "send-payment":
-                print("    Sender:      {} (balance {})".format(signed_tx["from"], to_currency(balance)))
-                print("    Receiver:    {}".format(signed_tx["to"]))
-                print("    Amount:      {:.9f}".format(to_currency(signed_tx["amount"])))
-            else:
-                print("    Delegator:   {} (balance {})".format(signed_tx["delegator"], to_currency(balance)))
-                print("    Delegate:    {}".format(signed_tx["new_delegate"]))
-
-            print("    Fee:         {:.9f}".format(to_currency(signed_tx["fee"])))
-            if args.operation == "send-payment":
-                print("    Total:       {:.9f}".format(to_currency(amount + fee)))
-            print("    Nonce:       {}".format(signed_tx["nonce"]))
-
-            if valid_until != MAX_VALID_UNTIL:
-                print("    Valid until: {}".format(valid_until))
-            if memo != "":
-                print("    Memo:        {}".format(memo))
+            print_transaction(args.operation, account, balance,
+                              signed_tx["from"] if args.operation == "send-payment" else signed_tx["delegator"],
+                              signed_tx["to"] if args.operation == "send-payment" else signed_tx["new_delegate"],
+                              int(signed_tx["amount"]) if args.operation == "send-payment" else 0,
+                              int(signed_tx["fee"]), signed_tx["nonce"], valid_until, memo)
 
             print("    Signature:   {}...".format(signed_payload["signature"][0:74]))
             print()
@@ -955,6 +1002,118 @@ if __name__ == "__main__":
 
             print()
             print("Transaction id: {}".format(tx_hash))
+
+        elif (args.operation == "send-payment" or args.operation == "delegate") and args.offline:
+            ledger_init()
+
+            # Set common user supplied parameters
+            if args.operation == "send-payment":
+                account = args.sender_bip44_account
+                sender = args.sender_address
+                receiver = args.receiver
+                amount = from_currency(args.amount)
+            elif args.operation == "delegate":
+                account = args.delegator_bip44_account
+                sender = args.delegator_address
+                receiver = args.delegate
+                amount = 0
+
+            # Set optional memo
+            memo = args.memo if args.memo is not None else ""
+            memo = memo[:MAX_MEMO_LEN] if len(memo) > MAX_MEMO_LEN else memo
+
+            NETWORK = args.network if args.network is not None else "mainnet"
+
+            if args.fee is None:
+                raise Exception("Offline mode requires --fee")
+            fee = from_currency(args.fee)
+
+            if args.nonce is None:
+                raise Exception("Offline mode requires --nonce")
+            nonce = int(args.nonce)
+
+            valid_until = args.valid_until if args.valid_until is not None else ""
+
+            print()
+            print("Sign transaction:")
+            print_transaction(args.operation, account, None, sender, receiver,
+                              amount, fee, nonce, valid_until, memo)
+
+            answer = str(input("Continue? (y/N) ")).lower().strip()
+            if answer != 'y':
+                sys.exit(211)
+            print()
+
+            if valid_until == "":
+                # None means valid forever
+                valid_until = MAX_VALID_UNTIL
+
+            # Tell Ledger to construct, verify and sign the tx
+            print("Signing transaction (please confirm on Ledger device)... ", end="", flush=True)
+            signature = ledger_sign_tx(tx_type_from_op(args.operation),
+                                       account,
+                                       sender,
+                                       receiver,
+                                       amount,
+                                       fee,
+                                       nonce,
+                                       valid_until,
+                                       memo,
+                                       network_id_from_string(NETWORK))
+            print("done", flush=True)
+
+            if VERBOSE:
+                print("\nReceived signature: {}".format(signature))
+
+            if args.operation == "send-payment":
+                transaction_data = json.loads(r"""{
+                    "to": "",
+                    "from": "",
+                    "fee": "",
+                    "token": "1",
+                    "nonce": "",
+                    "memo": null,
+                    "amount": "",
+                    "valid_until": ""
+                }""")
+                transaction_data["to"] = receiver
+                transaction_data["from"] = sender
+                transaction_data["amount"] = "{}".format(amount)
+            elif args.operation == "delegate":
+                transaction_data = json.loads(r"""{
+                    "delegator": "",
+                    "new_delegate": "",
+                    "fee": "",
+                    "nonce": "",
+                    "memo": null,
+                    "valid_until": ""
+                }""")
+                transaction_data["new_delegate"] = receiver
+                transaction_data["delegator"] = sender
+
+            transaction_data["fee"] = "{}".format(fee)
+            transaction_data["nonce"] = "{}".format(nonce)
+            if memo != "":
+                transaction_data["memo"] = memo
+            transaction_data["valid_until"] = "{}".format(valid_until)
+
+            transaction_json = json.loads(r"""{
+                "signature": "",
+                "payment": null,
+                "stake_delegation": null,
+                "create_token": null,
+                "create_token_account": null,
+                "mint_tokens": null
+            }""")
+
+            transaction_json["signature"] = signature
+            if args.operation == "send-payment":
+                transaction_json["payment"] = transaction_data
+            elif args.operation == "delegate":
+                transaction_json["stake_delegation"] = transaction_data
+
+            print("")
+            print(json.dumps(transaction_json, indent=2))
 
         elif args.operation == "test-transaction":
             ledger_init()
