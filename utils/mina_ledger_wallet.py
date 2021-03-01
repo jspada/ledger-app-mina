@@ -139,7 +139,7 @@ def rosetta_network_request():
 
     # Query
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(network_request))
+        print("\nREQUEST = {}\n".format(json.dumps(network_request)))
 
     print("Getting network identifier... ", end="", flush=True)
     network_resp = requests.post(MINA_URL + '/network/list',
@@ -149,24 +149,24 @@ def rosetta_network_request():
     if "network_identifiers" not in network_resp:
         print("error")
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(network_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
         raise Exception("Failed to get network identifiers")
     network_identifiers = network_resp["network_identifiers"]
     if len(network_identifiers) < 1:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(network_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
         raise Exception("Empty network identifiers")
     identifier = network_identifiers[0]
     if identifier["blockchain"] != "coda":
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(network_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
         raise Exception("Invalid blockchain {}".format(identifier["blockchain"]))
     print("{}".format(NETWORK), flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(network_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
 
     return identifier["network"]
 
@@ -188,7 +188,7 @@ def rosetta_metadata_request(sender_address):
     construction_metadata_request["options"]["sender"] = sender_address;
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(construction_metadata_request))
+        print("\nREQUEST = {}\n".format(json.dumps(construction_metadata_request)))
 
     print("Getting account nonce and suggested fee... ", end="", flush=True)
     metadata_resp = requests.post(MINA_URL + '/construction/metadata',
@@ -196,17 +196,17 @@ def rosetta_metadata_request(sender_address):
     if "metadata" not in metadata_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(metadata_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
         raise Exception("Failed to get metadata")
     if "suggested_fee" not in metadata_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(metadata_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
         raise Exception("Failed to get suggested fee")
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(metadata_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
 
     nonce = int(metadata_resp["metadata"]["nonce"]);
     fee = int(metadata_resp["suggested_fee"][0]["value"])
@@ -235,7 +235,7 @@ def rosetta_balance_request(address):
     account_balance_request["account_identifier"]["address"] = address
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(account_balance_request))
+        print("\nREQUEST = {}\n".format(json.dumps(account_balance_request)))
 
     print("Getting account balance... ", end="", flush=True)
     balance_resp = requests.post(MINA_URL + '/account/balance',
@@ -244,12 +244,12 @@ def rosetta_balance_request(address):
     if "balances" not in balance_resp:
         print("error")
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(balance_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(balance_resp)))
         raise Exception("Failed to get balance")
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(balance_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(balance_resp)))
 
     return int(balance_resp["balances"][0]["value"])
 
@@ -355,7 +355,7 @@ def rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce):
     construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(construction_payloads_request))
+        print("\nREQUEST = {}\n".format(json.dumps(construction_payloads_request)))
 
     print("Constructing unsigned payment transaction... ", end="", flush=True)
     payloads_resp = requests.post(MINA_URL + '/construction/payloads',
@@ -363,18 +363,18 @@ def rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce):
     if "unsigned_transaction" not in payloads_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(payloads_resp)))
         raise Exception("Failed to get unsigned transaction")
     payload = json.loads(payloads_resp["unsigned_transaction"])
     if "payment" not in payload or payload["payment"] == None:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(payloads_resp)))
         raise Exception("Failed to get payment info")
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(payloads_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(payloads_resp)))
 
     return payload, payload["payment"]
 
@@ -447,7 +447,7 @@ def rosetta_delegation_payloads_request(delegator, delegate, fee, nonce):
     construction_payloads_request["metadata"]["nonce"] = '{}'.format(nonce)
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(construction_payloads_request))
+        print("\nREQUEST = {}\n".format(json.dumps(construction_payloads_request)))
 
     print("Constructing unsigned delegate transaction... ", end="", flush=True)
     payloads_resp = requests.post(MINA_URL + '/construction/payloads',
@@ -455,18 +455,18 @@ def rosetta_delegation_payloads_request(delegator, delegate, fee, nonce):
     if "unsigned_transaction" not in payloads_resp:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(payloads_resp)))
         raise Exception("Failed to get unsigned transaction")
     payload = json.loads(payloads_resp["unsigned_transaction"])
     if "stakeDelegation" not in payload or payload["stakeDelegation"] == None:
         print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(payloads_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(payloads_resp)))
         raise Exception("Failed to get payment info") # TODO update all this
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(payloads_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(payloads_resp)))
 
     return payload, payload["stakeDelegation"]
 
@@ -505,7 +505,7 @@ def rosetta_combine_request(payload, signature, tx_type):
     construction_combine_request["signatures"][0]["hex_bytes"] = signature
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(construction_combine_request))
+        print("\nREQUEST = {}\n".format(json.dumps(construction_combine_request)))
 
     print("Constructing signed transaction... ", end="", flush=True)
     combine_resp = requests.post(MINA_URL + '/construction/combine',
@@ -514,7 +514,7 @@ def rosetta_combine_request(payload, signature, tx_type):
     if "signed_transaction" not in combine_resp:
         print("error")
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(combine_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(combine_resp)))
         raise Exception("Failed to construct signed transaction")
     payload = json.loads(combine_resp["signed_transaction"])
 
@@ -522,20 +522,20 @@ def rosetta_combine_request(payload, signature, tx_type):
         if "payment" not in payload or payload["payment"] == None:
             print("error")
             if VERBOSE:
-                print("\nRESPONSE = {}\n".format(combine_resp))
+                print("\nRESPONSE = {}\n".format(json.dumps(combine_resp)))
                 raise Exception("Failed to get payment info")
         signed_tx = payload["payment"]
     else:
         if "stake_delegation" not in payload or payload["stake_delegation"] == None:
             print("error")
             if VERBOSE:
-                print("\nRESPONSE = {}\n".format(combine_resp))
+                print("\nRESPONSE = {}\n".format(json.dumps(combine_resp)))
                 raise Exception("Failed to get stakeDelegation info")
         signed_tx = payload["stake_delegation"]
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(combine_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(combine_resp)))
 
     return payload, signed_tx
 
@@ -552,7 +552,7 @@ def rosetta_submit_request(signed_tx):
     construction_submit_request["signed_transaction"] = json.dumps(signed_tx)
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(construction_submit_request))
+        print("\nREQUEST = {}\n".format(json.dumps(construction_submit_request)))
 
     print("Sending transaction... ", end="", flush=True)
     submit_resp = requests.post(MINA_URL + '/construction/submit',
@@ -561,7 +561,7 @@ def rosetta_submit_request(signed_tx):
     if "transaction_identifier" not in submit_resp:
         print("error")
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(submit_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(submit_resp)))
         if "code" in submit_resp and "details" in submit_resp:
             raise Exception(submit_resp["details"]["body"][1])
         else:
@@ -569,38 +569,43 @@ def rosetta_submit_request(signed_tx):
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(submit_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(submit_resp)))
 
     return submit_resp["transaction_identifier"]["hash"]
 
-def rosetta_parse_request(tx):
+def rosetta_parse_request(tx, signed):
     construction_parse_request = json.loads(r"""{
         "network_identifier": {
             "blockchain": "coda",
             "network": ""
         },
+        "signed": false,
         "transaction": ""
     }""")
-
     construction_parse_request["network_identifier"]["network"] = NETWORK
+    construction_parse_request["signed"] = signed
     construction_parse_request["transaction"] = json.dumps(tx)
 
     if VERBOSE:
-        print("\nREQUEST = {}\n".format(construction_parse_request))
+        print("\nREQUEST = {}\n".format(json.dumps(construction_parse_request)))
 
     print("Checking transaction... ", end="", flush=True)
     parse_resp = requests.post(MINA_URL + '/construction/parse',
                                 data=json.dumps(construction_parse_request)).json()
 
     if "operations" not in parse_resp:
-        print("error")
+        print("error", flush=True)
         if VERBOSE:
-            print("\nRESPONSE = {}\n".format(parse_resp))
+            print("\nRESPONSE = {}\n".format(json.dumps(parse_resp)))
+        if "code" in parse_resp and "details" in parse_resp:
+            raise Exception(parse_resp["details"]["body"][1])
         raise Exception("Failed to parse transaction")
     print("done", flush=True)
 
     if VERBOSE:
-        print("\nRESPONSE = {}\n".format(parse_resp))
+        print("\nRESPONSE = {}\n".format(json.dumps(parse_resp)))
+
+    return True
 
 def ledger_init():
     global DONGLE
@@ -910,8 +915,8 @@ if __name__ == "__main__":
             if VERBOSE:
                 print("\nUNSIGNED_TX = {}\n".format(json.dumps(unsigned_payload)))
 
-            # # Rosetta parse
-            # rosetta_parse_request(unsigned_tx)
+            # Rosetta parse
+            rosetta_parse_request(unsigned_payload, False)
 
             # Security check rosetta output 1
             if not check_tx(tx_type_from_op(args.operation),
@@ -958,7 +963,7 @@ if __name__ == "__main__":
                 print("\nSIGNED_TX   = {}\n".format(json.dumps(signed_payload)))
 
             # Rosetta parse
-            # rosetta_parse_request(signed_tx)
+            rosetta_parse_request(signed_payload, True)
 
             # Security check rosetta output 2
             if not check_tx(tx_type_from_op(args.operation),
