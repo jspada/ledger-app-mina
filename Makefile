@@ -287,7 +287,7 @@ read -p "Please unlock your Ledger device and exit any apps (press any key to co
 endef
 export RELEASE_DEPS
 
-release:
+release: all
 	@# Must force clean like this because Ledger makefile always runs first
 	@echo
 	@echo "RELEASE BUILD: Forcing clean"
