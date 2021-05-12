@@ -1496,11 +1496,11 @@ inline void poseidon_init(State s, const uint8_t network_id)
 {
     switch (network_id) {
         case TESTNET_ID:
-            os_memmove(s, TESTNET_IV, sizeof(State));
+            memmove(s, TESTNET_IV, sizeof(State));
             break;
 
         case MAINNET_ID:
-            os_memmove(s, MAINNET_IV, sizeof(State));
+            memmove(s, MAINNET_IV, sizeof(State));
             break;
     }
 }

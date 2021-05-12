@@ -4,7 +4,7 @@
 uint8_t set_result_test_crypto(void)
 {
     uint8_t tx = 0;
-    os_memmove(G_io_apdu_buffer + tx, "Success", 8);
+    memmove(G_io_apdu_buffer + tx, "Success", 8);
     tx += 8;
     return tx;
 }
@@ -59,11 +59,11 @@ UX_FLOW(ux_test_crypto_testing_flow,
 #endif
 
 void handle_test_crypto(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
-                        uint8_t dataLength, volatile unsigned int *flags,
-                        volatile unsigned int *tx)
+                        uint8_t dataLength, volatile unsigned int *flags)
 {
     UNUSED(p1);
     UNUSED(p2);
+    UNUSED(dataBuffer);
 
     if (dataLength != 0) {
         THROW(INVALID_PARAMETER);

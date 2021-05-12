@@ -41,7 +41,7 @@ static struct ui_t {
 static uint8_t set_result_get_signature(void)
 {
     uint8_t tx = 0;
-    os_memmove(G_io_apdu_buffer + tx, &_sig, sizeof(_sig));
+    memmove(G_io_apdu_buffer + tx, &_sig, sizeof(_sig));
     tx += sizeof(_sig);
     return tx;
 }
@@ -56,7 +56,7 @@ static void sign_transaction(void)
             if (!generate_address(_address, sizeof(_address), &_kp.pub)) {
                 THROW(INVALID_PARAMETER);
             }
-            if (os_memcmp(_address, _ui.from, sizeof(_address)) != 0) {
+            if (memcmp(_address, _ui.from, sizeof(_address)) != 0) {
                 THROW(INVALID_PARAMETER);
             }
 
@@ -508,8 +508,7 @@ UX_FLOW(
 #endif
 
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
-                    uint8_t dataLength, volatile unsigned int *flags,
-                    volatile unsigned int *unused)
+                    uint8_t dataLength, volatile unsigned int *flags)
 {
     UNUSED(p1);
     UNUSED(p2);
@@ -522,7 +521,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _account = read_uint32_be(dataBuffer);
 
     // 4-58: from_address
-    os_memcpy(_ui.from, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
+    memcpy(_ui.from, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
     _ui.from[MINA_ADDRESS_LEN - 1] = '\0';
     if (!validate_address(_ui.from)) {
         THROW(INVALID_PARAMETER);
@@ -533,7 +532,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     read_public_key_compressed(&_tx.fee_payer_pk, _ui.from);
 
     // 59-113: to
-    os_memcpy(_ui.to, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
+    memcpy(_ui.to, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
     _ui.to[MINA_ADDRESS_LEN - 1] = '\0';
     if (!validate_address(_ui.to)) {
         THROW(INVALID_PARAMETER);
@@ -573,7 +572,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     _tx.token_locked = false;
 
     // 138-169: memo
-    os_memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
+    memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
     _ui.memo[sizeof(_ui.memo) - 1] = '\0';
     transaction_prepare_memo(_tx.memo, _ui.memo);
 

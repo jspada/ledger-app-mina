@@ -33,11 +33,11 @@ if [ ! -d dev-env/SDK ] ; then
     mkdir dev-env/CC/others
     mkdir dev-env/CC/nanox
 
-    wget https://launchpad.net/gcc-arm-embedded/5.0/5-2016-q1-update/+download/gcc-arm-none-eabi-5_3-2016q1-20160330-linux.tar.bz2
-    tar xf gcc-arm-none-eabi-5_3-2016q1-20160330-linux.tar.bz2
-    rm gcc-arm-none-eabi-5_3-2016q1-20160330-linux.tar.bz2
-    cp -r gcc-arm-none-eabi-5_3-2016q1 dev-env/CC/nanox/gcc-arm-none-eabi-5_3-2016q1
-    mv gcc-arm-none-eabi-5_3-2016q1 dev-env/CC/others/gcc-arm-none-eabi-5_3-2016q1
+    wget https://developer.arm.com/-/media/Files/downloads/gnu-rm/10-2020q4/gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
+    tar xf gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
+    rm gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
+    cp -r gcc-arm-none-eabi-10-2020-q4-major dev-env/CC/nanox/
+    mv gcc-arm-none-eabi-10-2020-q4-major dev-env/CC/others/
 
     wget http://releases.llvm.org/4.0.0/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-16.10.tar.xz -O clang+llvm.tar.xz
     tar xf clang+llvm.tar.xz

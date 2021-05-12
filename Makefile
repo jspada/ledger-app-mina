@@ -82,6 +82,10 @@ else
 EMULATOR=0
 endif
 
+ifneq ("$(EMULATOR_SDK)","")
+EMULATOR_SDK_ARG=-k $(EMULATOR_SDK)
+endif
+
 ifeq ("$(NO_EMULATOR_TESTS)","")
 EMULATOR_TESTS=1
 else
@@ -178,6 +182,9 @@ $(info RELEASE_BUILD        $(RELEASE_BUILD))
 $(info TARGET_NAME          $(TARGET_NAME))
 $(info EMULATOR             $(EMULATOR))
 $(info EMULATOR_MODEL       $(EMULATOR_MODEL))
+ifneq ("$(EMULATOR_SDK)","")
+$(info EMULATOR_SDK         $(EMULATOR_SDK))
+endif
 $(info EMULATOR_TESTS       $(EMULATOR_TESTS))
 $(info AUTOMATION           $(AUTOMATION))
 $(info ON_DEVICE_UNIT_TESTS $(ON_DEVICE_UNIT_TESTS))
@@ -222,7 +229,7 @@ endif
 ifneq ($(BOLOS_ENV),)
 $(info BOLOS_ENV=$(BOLOS_ENV))
 CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
-GCCPATH := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
+GCCPATH := $(BOLOS_ENV)/gcc-arm-none-eabi-10-2020-q4-major/bin/
 else
 $(info BOLOS_ENV is not set: falling back to CLANGPATH and GCCPATH)
 endif
@@ -388,7 +395,7 @@ endif
 run: all dev-env/speculos/build/src/launcher
 	@if [ $(EMULATOR) -eq 1 ]; then \
 	    echo "Running $(EMULATOR_MODEL) emulator" ; \
-	    ./dev-env/speculos/speculos.py -m $(EMULATOR_MODEL) --ontop $(EMULATOR_AUTOMATION) \
+	    ./dev-env/speculos/speculos.py $(EMULATOR_SDK_ARG) -m $(EMULATOR_MODEL) --ontop $(EMULATOR_AUTOMATION) \
 	                       -s "$(TEST_MNEMONIC)" \
 	                       ./bin/app.elf > emulator.log 2>&1 & \
 	    echo $$! > emulator.pid || exit 211; \

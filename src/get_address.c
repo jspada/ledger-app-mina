@@ -10,7 +10,7 @@ static char     _address[MINA_ADDRESS_LEN];
 static uint8_t set_result_get_address(void)
 {
     uint8_t tx = 0;
-    os_memmove(G_io_apdu_buffer + tx, _address, sizeof(_address));
+    memmove(G_io_apdu_buffer + tx, _address, sizeof(_address));
     tx += sizeof(_address);
     return tx;
 }
@@ -173,8 +173,7 @@ static void gen_address(void)
 #endif
 
 void handle_get_address(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
-                        uint8_t dataLength, volatile unsigned int *flags,
-                        volatile unsigned int *tx)
+                        uint8_t dataLength, volatile unsigned int *flags)
 {
     UNUSED(p1);
     UNUSED(p2);

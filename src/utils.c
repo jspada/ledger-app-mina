@@ -7,8 +7,6 @@
 
 #ifdef LEDGER_BUILD
     #include <os.h>
-#else
-    #define os_memcpy memcpy
 #endif
 
 static const char B58_ALPHABET[] = {
@@ -33,7 +31,7 @@ int b58_encode(const unsigned char *in, unsigned char length,
         // Input buffer too big
         return -1;
     }
-    os_memcpy(tmp, in, length);
+    memcpy(tmp, in, length);
     while ((zeroCount < length) && (tmp[zeroCount] == 0)) {
         ++zeroCount;
     }
@@ -64,7 +62,7 @@ int b58_encode(const unsigned char *in, unsigned char length,
         // Output buffer too small
         return -1;
     }
-    os_memcpy(out, (buffer + j), length);
+    memcpy(out, (buffer + j), length);
     return length;
 }
 
@@ -228,6 +226,9 @@ char *value_to_string(char *buf, const size_t len, uint64_t value)
     }
     digits = digits ? digits : 1;
     size_t total_len = digits + 1;
+    if (total_len > len) {
+        return NULL;
+    }
 
     char *end = buf + total_len - 1;
     *end = '\0';

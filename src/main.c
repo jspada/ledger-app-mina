@@ -67,21 +67,21 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx,
                     handle_get_address(G_io_apdu_buffer[OFFSET_P1],
                                        G_io_apdu_buffer[OFFSET_P2],
                                        G_io_apdu_buffer + OFFSET_CDATA,
-                                       dataLength, flags, tx);
+                                       dataLength, flags);
                     break;
 
                 case INS_SIGN_TX:
                     handle_sign_tx(G_io_apdu_buffer[OFFSET_P1],
                                    G_io_apdu_buffer[OFFSET_P2],
                                    G_io_apdu_buffer + OFFSET_CDATA,
-                                   dataLength, flags, tx);
+                                   dataLength, flags);
                     break;
 
                 case INS_TEST_CRYPTO:
                     handle_test_crypto(G_io_apdu_buffer[OFFSET_P1],
                                        G_io_apdu_buffer[OFFSET_P2],
                                        G_io_apdu_buffer + OFFSET_CDATA,
-                                       dataLength, flags, tx);
+                                       dataLength, flags);
                     break;
 
                 default:
@@ -196,6 +196,7 @@ void io_seproxyhal_display(const bagl_element_t *element) {
 }
 
 unsigned char io_event(unsigned char channel) {
+    UNUSED(channel);
     // nothing done with the event, throw an error on the transport layer if
     // needed
 

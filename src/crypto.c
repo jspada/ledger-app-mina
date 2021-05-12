@@ -11,6 +11,10 @@
 //         GROUP_ORDER   = 28948022309329048855892746252171976963363056481941647379679742748393362948097 (Fq, 0x94)
 //         FIELD_MODULUS = 28948022309329048855892746252171976963363056481941560715954676764349967630337 (Fp, 0x4c)
 
+#include <lcx_sha256.h>
+#include <lcx_blake2.h>
+#include <lcx_math.h>
+
 #include "crypto.h"
 #include "poseidon.h"
 #include "utils.h"
@@ -130,7 +134,7 @@ static const Affine AFFINE_ONE = {
 
 void field_copy(Field b, const Field a)
 {
-    os_memmove(b, a, FIELD_BYTES);
+    memmove(b, a, FIELD_BYTES);
 }
 
 void field_add(Field c, const Field a, const Field b)
@@ -172,7 +176,7 @@ void field_pow(Field c, const Field a, const Field e)
 
 bool field_eq(const Field a, const Field b)
 {
-    return (os_memcmp(a, b, FIELD_BYTES) == 0);
+    return (memcmp(a, b, FIELD_BYTES) == 0);
 }
 
 bool field_is_odd(const Field y)
@@ -186,7 +190,7 @@ void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len)
         THROW(INVALID_PARAMETER);
     }
 
-    os_memmove(a, bytes, SCALAR_BYTES);
+    memmove(a, bytes, SCALAR_BYTES);
 
     // Make sure the scalar is in [0, p)
     //
@@ -214,7 +218,7 @@ void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len)
 
 void scalar_copy(Scalar b, const Scalar a)
 {
-    os_memmove(b, a, SCALAR_BYTES);
+    memmove(b, a, SCALAR_BYTES);
 }
 
 void scalar_add(Scalar c, const Scalar a, const Scalar b)
@@ -251,7 +255,7 @@ void scalar_pow(Scalar c, const Scalar a, const Scalar e)
 
 bool scalar_eq(const Scalar a, const Scalar b)
 {
-    return os_memcmp(a, b, SCALAR_BYTES) == 0;
+    return memcmp(a, b, SCALAR_BYTES) == 0;
 }
 
 bool scalar_is_zero(const Scalar a)
@@ -261,7 +265,7 @@ bool scalar_is_zero(const Scalar a)
 
 void group_copy(Group *b, const Group *a)
 {
-    os_memmove(b, a, sizeof(Group));
+    memmove(b, a, sizeof(Group));
 }
 
 // zero is the only point with Z = 0 in jacobian coordinates
@@ -553,7 +557,7 @@ bool generate_address(char *address, const size_t len, const Affine *pub_key)
 
     uint8_t hash2[CX_SHA256_SIZE];
     cx_hash_sha256(hash1, sizeof(hash1), hash2, sizeof(hash2));
-    os_memcpy(raw.checksum, hash2, 4);
+    memcpy(raw.checksum, hash2, 4);
 
     // Encode as address
     int result = b58_encode((unsigned char *)&raw, sizeof(raw), (unsigned char *)address, len);
@@ -592,7 +596,7 @@ bool validate_address(const char *address)
 
     uint8_t hash2[CX_SHA256_SIZE];
     cx_hash_sha256(hash1, sizeof(hash1), hash2, sizeof(hash2));
-    return os_memcmp(raw->checksum, hash2, 4) == 0;
+    return memcmp(raw->checksum, hash2, 4) == 0;
 }
 
 void message_derive(Scalar out, const Keypair *kp, const ROInput *input, const uint8_t network_id)

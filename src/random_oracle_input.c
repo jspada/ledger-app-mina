@@ -2,8 +2,6 @@
 
 #ifdef LEDGER_BUILD
     #include <os.h>
-#else
-    #define os_memcpy memcpy
 #endif
 
 #include "random_oracle_input.h"
@@ -182,8 +180,8 @@ int roinput_derive_message(uint8_t *out, const size_t len, const Keypair *kp, co
         return -1;
     }
 
-    os_memcpy(input.fields, msg->fields, FIELD_BYTES * msg->fields_len);
-    os_memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
+    memcpy(input.fields, msg->fields, FIELD_BYTES * msg->fields_len);
+    memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
     input.fields_len = msg->fields_len;
     input.bits_len = msg->bits_len;
 
@@ -216,8 +214,8 @@ int roinput_hash_message(Field *out, const size_t len, const Affine *pub, const 
         return -1;
     }
 
-    os_memcpy(input.fields, msg->fields, FIELD_BYTES * msg->fields_len);
-    os_memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
+    memcpy(input.fields, msg->fields, FIELD_BYTES * msg->fields_len);
+    memcpy(input.bits, msg->bits, sizeof(uint8_t) * (msg->bits_len + 7)/8);
     input.fields_len = msg->fields_len;
     input.bits_len = msg->bits_len;
 
