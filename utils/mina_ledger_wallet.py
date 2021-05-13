@@ -147,7 +147,7 @@ def rosetta_network_request():
 
     # Validate response
     if "network_identifiers" not in network_resp:
-        print("error")
+        print("error", flush=True)
         if VERBOSE:
             print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
         raise Exception("Failed to get network identifiers")
@@ -158,12 +158,22 @@ def rosetta_network_request():
             print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
         raise Exception("Empty network identifiers")
     identifier = network_identifiers[0]
-    if identifier["blockchain"] != "coda":
+
+    if "blockchain" not in identifier:
+        print("error", flush=True)
+        raise Exception("Failed to get blockchain")
+
+    if identifier["blockchain"] != "coda" and idenfifier["blockchain"] != "mina":
         print("error", flush=True)
         if VERBOSE:
             print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
         raise Exception("Invalid blockchain {}".format(identifier["blockchain"]))
-    print("{}".format(NETWORK), flush=True)
+
+    if "network" not in identifier:
+        print("error", flush=True)
+        raise Exception("Failed to get network")
+
+    print("{}".format(identifier["network"]), flush=True)
 
     if VERBOSE:
         print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
@@ -190,7 +200,7 @@ def rosetta_metadata_request(sender_address):
     if VERBOSE:
         print("\nREQUEST = {}\n".format(json.dumps(construction_metadata_request)))
 
-    print("Getting account nonce and suggested fee... ", end="", flush=True)
+    print("Getting account nonce, suggested fee and minimum fee... ", end="", flush=True)
     metadata_resp = requests.post(MINA_URL + '/construction/metadata',
                                   data=json.dumps(construction_metadata_request)).json()
     if "metadata" not in metadata_resp:
@@ -203,15 +213,51 @@ def rosetta_metadata_request(sender_address):
         if VERBOSE:
             print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
         raise Exception("Failed to get suggested fee")
+
+    if "nonce" not in metadata_resp["metadata"]:
+        raise Exception("Failed to get nonce")
+    nonce = int(metadata_resp["metadata"]["nonce"]);
+
+    minimum_fee = -1
+    suggested_fee = -1
+    for token in metadata_resp["suggested_fee"]:
+        if "value" not in token:
+            continue
+        if "currency" not in token:
+            continue
+        if "symbol" not in token["currency"]:
+            continue
+
+        if token["currency"]["symbol"] != "CODA" and \
+           token["currency"]["symbol"] != "MINA":
+            continue
+
+        suggested_fee = int(token["value"])
+
+        minimum_fee = 0
+        if "metadata" in token and "minimum_fee" in token["metadata"] and \
+           "value" in token["metadata"]["minimum_fee"]:
+            minimum_fee = int(token["metadata"]["minimum_fee"]["value"])
+
+        break
+
+    if suggested_fee == -1:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
+        raise Exception("Failed to get suggested fee")
+    if suggested_fee < minimum_fee:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
+        raise Exception("Suggested fee {} is less than minimum fee {}".format(to_currency(suggested_fee), to_currency(minimum_fee)))
+
     print("done", flush=True)
 
     if VERBOSE:
         print("\nRESPONSE = {}\n".format(json.dumps(metadata_resp)))
 
-    nonce = int(metadata_resp["metadata"]["nonce"]);
-    fee = int(metadata_resp["suggested_fee"][0]["value"])
-
-    return (nonce, fee)
+    return (nonce, suggested_fee, minimum_fee)
 
 def rosetta_balance_request(address):
     account_balance_request = json.loads(r"""{
@@ -246,12 +292,55 @@ def rosetta_balance_request(address):
         if VERBOSE:
             print("\nRESPONSE = {}\n".format(json.dumps(balance_resp)))
         raise Exception("Failed to get balance")
+
+    balances = balance_resp["balances"]
+    if len(balances) < 1:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nRESPONSE = {}\n".format(json.dumps(network_resp)))
+        raise Exception("Empty balances")
+
+    spendable_balance = -1
+    locked_balance = -1
+    total_balance = -1
+    for balance in balances:
+        if "value" not in balance:
+            continue
+        if "currency" not in balance:
+            continue
+        if "symbol" not in balance["currency"]:
+            continue
+        if balance["currency"]["symbol"] != "CODA" and \
+           balance["currency"]["symbol"] != "MINA":
+            continue
+
+        spendable_balance = int(balance["value"])
+
+        if "metadata" in balance and "locked_balance" in balance["metadata"] and \
+           "total_balance" in balance["metadata"]:
+            locked_balance = int(balance["metadata"]["locked_balance"])
+            total_balance = int(balance["metadata"]["total_balance"])
+
+        break
+
+    if spendable_balance == -1:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nRESPONSE = {}\n".format(json.dumps(balance_resp)))
+        raise Exception("Failed to get spendable balance")
+
+    if total_balance != -1 and total_balance != spendable_balance + locked_balance:
+        print("error", flush=True)
+        if VERBOSE:
+            print("\nRESPONSE = {}\n".format(json.dumps(balance_resp)))
+        raise Exception("Invalid balances")
+
     print("done", flush=True)
 
     if VERBOSE:
         print("\nRESPONSE = {}\n".format(json.dumps(balance_resp)))
 
-    return int(balance_resp["balances"][0]["value"])
+    return spendable_balance, locked_balance, total_balance
 
 def rosetta_send_payment_payloads_request(sender, receiver, amount, fee, nonce):
     construction_payloads_request = json.loads(r"""{
@@ -695,7 +784,7 @@ def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fe
     apdu = bytearray.fromhex(apduMessage)
     return DONGLE.exchange(apdu).hex()
 
-def print_transaction(operation, account, balance, sender, receiver, amount, fee, nonce, valid_until, memo):
+def print_transaction(operation, account, balance, locked_balance, sender, receiver, amount, fee, nonce, valid_until, memo):
     if network_id_from_string(NETWORK) == TESTNET_ID:
         print("    Network:     testnet")
     print("    Type:        {}".format(tx_type_name(operation)))
@@ -703,7 +792,8 @@ def print_transaction(operation, account, balance, sender, receiver, amount, fee
 
     if operation == "send-payment":
         if balance != None:
-            print("    Sender:      {} (balance {})".format(sender, to_currency(balance)))
+            balance_text = "balance" if locked_balance in set([None,-1,0]) else "spendable"
+            print("    Sender:      {} ({} {})".format(sender, balance_text, to_currency(balance)))
         else:
             print("    Sender:      {}".format(sender))
         print("    Receiver:    {}".format(receiver))
@@ -812,11 +902,17 @@ if __name__ == "__main__":
                 print("Using network override: {}".format(args.network))
                 NETWORK = args.network
 
-            balance = rosetta_balance_request(args.address)
+            balance, locked_balance, total_balance = rosetta_balance_request(args.address)
 
             print()
-            print("Address: {}".format(args.address))
-            print("Balance: {}".format(to_currency(balance)))
+            if locked_balance != -1 and locked_balance != 0:
+                print("Address:       {}".format(args.address))
+                print("Total balance: {}".format(to_currency(total_balance)))
+                print("Locked:        {}".format(to_currency(locked_balance)))
+                print("Spendable:     {}".format(to_currency(balance)))
+            else:
+                print("Address: {}".format(args.address))
+                print("Balance: {}".format(to_currency(balance)))
             print()
 
         elif (args.operation == "send-payment" or args.operation == "delegate") and not args.offline:
@@ -857,29 +953,31 @@ if __name__ == "__main__":
                 NETWORK = args.network
 
             # Lookup the senders nonce and suggested fee
-            nonce, fee = rosetta_metadata_request(sender)
+            nonce, fee, minimum_fee = rosetta_metadata_request(sender)
 
             # Apply optional overrides
             if args.fee is not None:
+                if from_currency(args.fee) < minimum_fee:
+                    raise Exception("Supplied fee {} is below minimum fee {}".format(args.fee, to_currency(minimum_fee)))
                 print("Using fee override: {}".format(args.fee))
                 fee = from_currency(args.fee)
             if args.nonce is not None:
                 print("Using nonce override: {}".format(args.nonce))
                 nonce = int(args.nonce)
 
-            balance = rosetta_balance_request(sender)
+            balance, locked_balance, total_balance = rosetta_balance_request(sender)
 
             if amount + fee > balance:
                 if args.operation == "send-payment":
-                    print("Total amount {} exceeds account balance {}".format(to_currency(amount + fee), to_currency(balance)))
+                    print("Total amount {} exceeds spendable balance {}".format(to_currency(amount + fee), to_currency(balance)))
                 else:
-                    print("Delegation fee {} exceeds account balance {}".format(to_currency(amount + fee), to_currency(balance)))
+                    print("Delegation fee {} exceeds spendable balance {}".format(to_currency(amount + fee), to_currency(balance)))
                 sys.exit(211)
 
             print()
             print("Sign transaction:")
 
-            print_transaction(args.operation, account, balance, sender, receiver,
+            print_transaction(args.operation, account, balance, locked_balance, sender, receiver,
                               amount, fee, nonce, valid_until, memo)
 
             if args.operation == "delegate":
@@ -982,7 +1080,7 @@ if __name__ == "__main__":
             print()
             print("Send transaction:")
 
-            print_transaction(args.operation, account, balance,
+            print_transaction(args.operation, account, balance, locked_balance,
                               signed_tx["from"] if args.operation == "send-payment" else signed_tx["delegator"],
                               signed_tx["to"] if args.operation == "send-payment" else signed_tx["new_delegate"],
                               int(signed_tx["amount"]) if args.operation == "send-payment" else 0,
@@ -1041,7 +1139,7 @@ if __name__ == "__main__":
 
             print()
             print("Sign transaction:")
-            print_transaction(args.operation, account, None, sender, receiver,
+            print_transaction(args.operation, account, None, None, sender, receiver,
                               amount, fee, nonce, valid_until, memo)
 
             answer = str(input("Continue? (y/N) ")).lower().strip()
