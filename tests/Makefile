@@ -3,8 +3,8 @@ EMULATOR=1
 else
 EMULATOR=0
 endif
-ifneq ("$(EMULATOR_SDK)","")
-EMULATOR_SDK_ARG=-k $(EMULATOR_SDK)
+ifeq ("$(EMULATOR_SDK)","")
+EMULATOR_SDK=2.0
 endif
 ifeq ("$(NO_EMULATOR_TESTS)","")
 EMULATOR_TESTS=1
@@ -76,7 +76,7 @@ endif
 
 define EMULATOR_TESTS_SCRIPT
 echo "Starting $(EMULATOR_MODEL) emulator"
-../dev-env/speculos/speculos.py $(EMULATOR_SDK_ARG) -m $(EMULATOR_MODEL) \
+../dev-env/speculos/speculos.py -k $(EMULATOR_SDK) -m $(EMULATOR_MODEL) \
                        $(EMULATOR_DISPLAY) $(EMULATOR_AUTOMATION) \
                        -s "$(TEST_MNEMONIC)" \
                        ../bin/app.elf > emulator_tests.log 2>&1 &
