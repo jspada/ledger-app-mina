@@ -83,7 +83,11 @@ EMULATOR=0
 endif
 
 ifeq ("$(EMULATOR_SDK)","")
+ifeq ("$(NANO_MODEL)","nanox")
+EMULATOR_SDK=1.2
+else
 EMULATOR_SDK=2.0
+endif
 endif
 
 ifeq ("$(NO_EMULATOR_TESTS)","")
@@ -141,7 +145,7 @@ DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
-DEFINES   	  += IO_SEPROXYHAL_BUFFER_SIZE_B=300
+DEFINES       += BUILD_NANOX IO_SEPROXYHAL_BUFFER_SIZE_B=300
 DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
 DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
 

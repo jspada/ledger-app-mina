@@ -3,23 +3,33 @@ EMULATOR=1
 else
 EMULATOR=0
 endif
+
 ifeq ("$(EMULATOR_SDK)","")
+ifeq ("$(NANO_MODEL)","nanox")
+EMULATOR_SDK=1.2
+else
 EMULATOR_SDK=2.0
 endif
+endif
+
 ifeq ("$(NO_EMULATOR_TESTS)","")
 EMULATOR_TESTS=1
 else
 EMULATOR_TESTS=0
 endif
+
 ifeq ("$(NANO_MODEL)","nanos")
 EMULATOR_MODEL=nanos
 endif
+
 ifeq ("$(NANO_MODEL)","nanox")
 EMULATOR_MODEL=nanox
 endif
+
 ifeq ("$(EMULATOR_MODEL)","")
 $(error Unknown NANO_MODEL '$(NANO_MODEL)')
 endif
+
 ifeq ("$(EMULATOR_MODEL)","")
 $(error Environment variable EMULATOR_MODEL is not set (source ./prepare-devenv.sh))
 endif
