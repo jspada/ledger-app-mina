@@ -11,7 +11,9 @@ uint8_t set_result_test_crypto(void)
 
 void test_crypto(void)
 {
-    curve_checks();
+    if (!curve_checks()) {
+        THROW(INVALID_PARAMETER);
+    }
     sendResponse(set_result_test_crypto(), true);
 }
 
