@@ -597,12 +597,12 @@ bool validate_address(const char *address)
     return memcmp(raw->checksum, hash2, 4) == 0;
 }
 
-void message_derive(Scalar out, const Keypair *kp, const ROInput *input, const uint8_t network_id)
+bool message_derive(Scalar out, const Keypair *kp, const ROInput *input, const uint8_t network_id)
 {
     uint8_t derive_msg[268] = { };
     int derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input, network_id);
     if (derive_len < 0) {
-        THROW(INVALID_PARAMETER);
+        return false;
     }
 
     // blake2b hash
@@ -621,6 +621,8 @@ void message_derive(Scalar out, const Keypair *kp, const ROInput *input, const u
 
     // Convert to scalar
     scalar_from_bytes(out, out, SCALAR_BYTES);
+
+    return true;
 }
 
 void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input, const uint8_t network_id)
@@ -647,7 +649,9 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t
     BEGIN_TRY {
         TRY {
             // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
-            message_derive(k, kp, input, network_id);
+            if (!message_derive(k, kp, input, network_id)) {
+                THROW(INVALID_PARAMETER);
+            }
 
             // r = k*g
             affine_scalar_mul(&r, k, &AFFINE_ONE);
