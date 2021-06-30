@@ -13,7 +13,6 @@ typedef struct {
     Transaction tx;
     Field       input_fields[3];
     uint8_t     input_bits[TX_BITSTRINGS_BYTES];
-    Signature   sig;
     uint8_t     tag;
 } tx_t;
 

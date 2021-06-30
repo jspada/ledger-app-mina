@@ -11,17 +11,10 @@
 static tx_t _tx;
 static ui_t _ui;
 
-static uint8_t set_result_get_signature(void)
-{
-    uint8_t size = 0;
-    memmove(G_io_apdu_buffer + size, &_tx.sig, sizeof(_tx.sig));
-    size += sizeof(_tx.sig);
-    return size;
-}
-
 static void sign_transaction(void)
 {
     char address[MINA_ADDRESS_LEN];
+    Signature sig;
     ROInput roinput;
     Keypair kp;
     bool error = false;
@@ -45,7 +38,7 @@ static void sign_transaction(void)
             roinput.bits_capacity = ARRAY_LEN(_tx.input_bits);
             transaction_to_roinput(&roinput, &_tx.tx);
 
-            if (!sign(&_tx.sig, &kp, &roinput, _tx.network_id)) {
+            if (!sign(&sig, &kp, &roinput, _tx.network_id)) {
                 THROW(INVALID_PARAMETER);
             }
         }
@@ -63,7 +56,9 @@ static void sign_transaction(void)
         THROW(INVALID_PARAMETER);
     }
 
-    sendResponse(set_result_get_signature(), true);
+    memmove(G_io_apdu_buffer, &sig, sizeof(sig));
+
+    sendResponse(sizeof(sig), true);
 }
 
 UX_STEP_NOCB_INIT(
