@@ -52,6 +52,7 @@ static void sign_transaction(void)
     char address[MINA_ADDRESS_LEN];
     ROInput roinput;
     Keypair kp;
+    bool error = false;
 
     BEGIN_TRY {
         TRY {
@@ -76,11 +77,18 @@ static void sign_transaction(void)
                 THROW(INVALID_PARAMETER);
             }
         }
+        CATCH_OTHER(e) {
+            error = true;
+        }
         FINALLY {
             // Clear private key from memory
             explicit_bzero((void *)kp.priv, sizeof(kp.priv));
         }
         END_TRY;
+    }
+
+    if (error) {
+        THROW(INVALID_PARAMETER);
     }
 
     sendResponse(set_result_get_signature(), true);
