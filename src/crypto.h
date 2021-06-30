@@ -61,7 +61,6 @@ void field_mul(Field c, const Field a, const Field b);
 void field_sq(Field b, const Field a);
 void field_pow(Field c, const Field a, const Field e);
 
-void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len);
 void scalar_copy(Scalar b, const Scalar a);
 bool scalar_eq(const Scalar a, const Scalar b);
 void scalar_add(Scalar c, const Scalar a, const Scalar b);

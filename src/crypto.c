@@ -186,14 +186,8 @@ bool field_is_odd(const Field y)
     return y[FIELD_BYTES - 1] & 0x01;
 }
 
-void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len)
+static void convert_to_scalar(Scalar a)
 {
-    if (len != SCALAR_BYTES) {
-        THROW(INVALID_PARAMETER);
-    }
-
-    memmove(a, bytes, SCALAR_BYTES);
-
     // Make sure the scalar is in [0, p)
     //
     // Note: Mina does rejection sampling to obtain a scalar in
@@ -519,7 +513,7 @@ void generate_keypair(Keypair *keypair, const uint32_t account)
 
     // Generate private key
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path, BIP32_PATH_LEN, keypair->priv, NULL);
-    scalar_from_bytes(keypair->priv, keypair->priv, sizeof(keypair->priv));
+    convert_to_scalar(keypair->priv);
 
     // Generate public key
     generate_pubkey(&keypair->pub, keypair->priv);
@@ -620,7 +614,7 @@ bool message_derive(Scalar out, const Keypair *kp, const ROInput *input, const u
     }
 
     // Convert to scalar
-    scalar_from_bytes(out, out, SCALAR_BYTES);
+    convert_to_scalar(out);
 
     return true;
 }
