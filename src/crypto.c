@@ -509,10 +509,6 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key)
 
 void generate_keypair(Keypair *keypair, const uint32_t account)
 {
-    if (!keypair) {
-        THROW(INVALID_PARAMETER);
-    }
-
     const uint32_t bip32_path[BIP32_PATH_LEN] = {
         44      | BIP32_HARDENED_OFFSET,
         12586   | BIP32_HARDENED_OFFSET, // 0x312a
