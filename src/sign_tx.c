@@ -8,20 +8,24 @@
 #include "random_oracle_input.h"
 #include "transaction.h"
 
-// Blockchain instance
-uint8_t _network_id;
+typedef struct transaction_s {
+  // Blockchain instance
+  uint8_t network_id;
 
-// Account variables
-static uint32_t _account;
-static Keypair  _kp;
-static char     _address[MINA_ADDRESS_LEN];
+  // Account variables
+  uint32_t account;
+  Keypair  kp;
+  char     address[MINA_ADDRESS_LEN];
 
-// Transaction related
-static Transaction _tx;
-static Field       _input_fields[3];
-static uint8_t     _input_bits[TX_BITSTRINGS_BYTES];
-static ROInput     _roinput;
-static Signature   _sig;
+  // Transaction related
+  Transaction tx;
+  Field       input_fields[3];
+  uint8_t     input_bits[TX_BITSTRINGS_BYTES];
+  ROInput     roinput;
+  Signature   sig;
+} tx_t;
+
+static tx_t _tx;
 
 // UI variables
 static struct ui_t {
@@ -40,10 +44,10 @@ static struct ui_t {
 
 static uint8_t set_result_get_signature(void)
 {
-    uint8_t tx = 0;
-    memmove(G_io_apdu_buffer + tx, &_sig, sizeof(_sig));
-    tx += sizeof(_sig);
-    return tx;
+    uint8_t size = 0;
+    memmove(G_io_apdu_buffer + size, &_tx.sig, sizeof(_tx.sig));
+    size += sizeof(_tx.sig);
+    return size;
 }
 
 static void sign_transaction(void)
@@ -52,26 +56,26 @@ static void sign_transaction(void)
         TRY {
             // Get the account's private key and validate corresponding
             // public key matches the from address
-            generate_keypair(&_kp, _account);
-            if (!generate_address(_address, sizeof(_address), &_kp.pub)) {
+            generate_keypair(&_tx.kp, _tx.account);
+            if (!generate_address(_tx.address, sizeof(_tx.address), &_tx.kp.pub)) {
                 THROW(INVALID_PARAMETER);
             }
-            if (memcmp(_address, _ui.from, sizeof(_address)) != 0) {
+            if (memcmp(_tx.address, _ui.from, sizeof(_tx.address)) != 0) {
                 THROW(INVALID_PARAMETER);
             }
 
             // Create random oracle input from transaction
-            _roinput.fields = _input_fields;
-            _roinput.fields_capacity = ARRAY_LEN(_input_fields);
-            _roinput.bits = _input_bits;
-            _roinput.bits_capacity = ARRAY_LEN(_input_bits);
-            transaction_to_roinput(&_roinput, &_tx);
+            _tx.roinput.fields = _tx.input_fields;
+            _tx.roinput.fields_capacity = ARRAY_LEN(_tx.input_fields);
+            _tx.roinput.bits = _tx.input_bits;
+            _tx.roinput.bits_capacity = ARRAY_LEN(_tx.input_bits);
+            transaction_to_roinput(&_tx.roinput, &_tx.tx);
 
-            sign(&_sig, &_kp, &_roinput, _network_id);
+            sign(&_tx.sig, &_tx.kp, &_tx.roinput, _tx.network_id);
         }
         FINALLY {
             // Clear private key from memory
-            explicit_bzero((void *)_kp.priv, sizeof(_kp.priv));
+            explicit_bzero((void *)_tx.kp.priv, sizeof(_tx.kp.priv));
         }
         END_TRY;
     }
@@ -518,7 +522,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     }
 
     // 0-3: from_bip44_account
-    _account = read_uint32_be(dataBuffer);
+    _tx.account = read_uint32_be(dataBuffer);
 
     // 4-58: from_address
     memcpy(_ui.from, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
@@ -526,10 +530,10 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     if (!validate_address(_ui.from)) {
         THROW(INVALID_PARAMETER);
     }
-    read_public_key_compressed(&_tx.source_pk, _ui.from);
+    read_public_key_compressed(&_tx.tx.source_pk, _ui.from);
 
     // Always the same as from for sent-payment and delegate txs
-    read_public_key_compressed(&_tx.fee_payer_pk, _ui.from);
+    read_public_key_compressed(&_tx.tx.fee_payer_pk, _ui.from);
 
     // 59-113: to
     memcpy(_ui.to, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
@@ -537,57 +541,57 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     if (!validate_address(_ui.to)) {
         THROW(INVALID_PARAMETER);
     }
-    read_public_key_compressed(&_tx.receiver_pk, _ui.to);
+    read_public_key_compressed(&_tx.tx.receiver_pk, _ui.to);
 
     // 114-121: amount
-    _tx.amount = read_uint64_be(dataBuffer + 114);
-    amount_to_string(_ui.amount, sizeof(_ui.amount), _tx.amount);
+    _tx.tx.amount = read_uint64_be(dataBuffer + 114);
+    amount_to_string(_ui.amount, sizeof(_ui.amount), _tx.tx.amount);
 
     // Set to 1 until token support is released
-    _tx.token_id = 1;
+    _tx.tx.token_id = 1;
 
     // 122-129: fee
-    _tx.fee = read_uint64_be(dataBuffer + 122);
-    amount_to_string(_ui.fee, sizeof(_ui.fee), _tx.fee);
+    _tx.tx.fee = read_uint64_be(dataBuffer + 122);
+    amount_to_string(_ui.fee, sizeof(_ui.fee), _tx.tx.fee);
 
     // UI total
-    if (_tx.amount + _tx.fee < _tx.amount) {
+    if (_tx.tx.amount + _tx.tx.fee < _tx.tx.amount) {
         // Overflow
         THROW(INVALID_PARAMETER);
     }
-    amount_to_string(_ui.total, sizeof(_ui.total), _tx.amount + _tx.fee);
+    amount_to_string(_ui.total, sizeof(_ui.total), _tx.tx.amount + _tx.tx.fee);
 
     // Set to 1 until token support is released
-    _tx.fee_token = 1;
+    _tx.tx.fee_token = 1;
 
     // 130-133: nonce
-    _tx.nonce = read_uint32_be(dataBuffer + 130);
-    value_to_string(_ui.nonce, sizeof(_ui.nonce), _tx.nonce);
+    _tx.tx.nonce = read_uint32_be(dataBuffer + 130);
+    value_to_string(_ui.nonce, sizeof(_ui.nonce), _tx.tx.nonce);
 
     // 134-137: valid_until
-    _tx.valid_until = read_uint32_be(dataBuffer + 134);
-    value_to_string(_ui.valid_until, sizeof(_ui.valid_until), _tx.valid_until);
+    _tx.tx.valid_until = read_uint32_be(dataBuffer + 134);
+    value_to_string(_ui.valid_until, sizeof(_ui.valid_until), _tx.tx.valid_until);
 
     // Fixed until token support is released
-    _tx.token_locked = false;
+    _tx.tx.token_locked = false;
 
     // 138-169: memo
     memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
     _ui.memo[sizeof(_ui.memo) - 1] = '\0';
-    transaction_prepare_memo(_tx.memo, _ui.memo);
+    transaction_prepare_memo(_tx.tx.memo, _ui.memo);
 
     // 170: tag
     uint8_t tag = *(dataBuffer + 170);
     if (tag != PAYMENT_TX && tag != DELEGATION_TX) {
         THROW(INVALID_PARAMETER);
     }
-    _tx.tag[0] = tag & 0x01;
-    _tx.tag[1] = tag & 0x02;
-    _tx.tag[2] = tag & 0x04;
+    _tx.tx.tag[0] = tag & 0x01;
+    _tx.tx.tag[1] = tag & 0x02;
+    _tx.tx.tag[2] = tag & 0x04;
 
     // 171: network_id
-    _network_id = *(dataBuffer + 171);
-    if (_network_id != TESTNET_ID && _network_id != MAINNET_ID) {
+    _tx.network_id = *(dataBuffer + 171);
+    if (_tx.network_id != TESTNET_ID && _tx.network_id != MAINNET_ID) {
         THROW(INVALID_PARAMETER);
     }
 
@@ -606,9 +610,9 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
         }
 
         // Select the appropriate UX flow
-        int n_idx = _network_id == MAINNET_ID;
+        int n_idx = _tx.network_id == MAINNET_ID;
         int t_idx = tag == DELEGATION_TX;
-        int v_idx = _tx.valid_until != (uint32_t)-1;
+        int v_idx = _tx.tx.valid_until != (uint32_t)-1;
         int m_idx = _ui.memo[0] != '\0';
 
         // Run the UX flow
