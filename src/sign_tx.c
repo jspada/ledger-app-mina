@@ -14,14 +14,11 @@ typedef struct transaction_s {
 
   // Account variables
   uint32_t account;
-  Keypair  kp;
-  char     address[MINA_ADDRESS_LEN];
 
   // Transaction related
   Transaction tx;
   Field       input_fields[3];
   uint8_t     input_bits[TX_BITSTRINGS_BYTES];
-  ROInput     roinput;
   Signature   sig;
 } tx_t;
 
@@ -52,30 +49,34 @@ static uint8_t set_result_get_signature(void)
 
 static void sign_transaction(void)
 {
+    char address[MINA_ADDRESS_LEN];
+    ROInput roinput;
+    Keypair kp;
+
     BEGIN_TRY {
         TRY {
             // Get the account's private key and validate corresponding
             // public key matches the from address
-            generate_keypair(&_tx.kp, _tx.account);
-            if (!generate_address(_tx.address, sizeof(_tx.address), &_tx.kp.pub)) {
+            generate_keypair(&kp, _tx.account);
+            if (!generate_address(address, sizeof(address), &kp.pub)) {
                 THROW(INVALID_PARAMETER);
             }
-            if (memcmp(_tx.address, _ui.from, sizeof(_tx.address)) != 0) {
+            if (memcmp(address, _ui.from, sizeof(address)) != 0) {
                 THROW(INVALID_PARAMETER);
             }
 
             // Create random oracle input from transaction
-            _tx.roinput.fields = _tx.input_fields;
-            _tx.roinput.fields_capacity = ARRAY_LEN(_tx.input_fields);
-            _tx.roinput.bits = _tx.input_bits;
-            _tx.roinput.bits_capacity = ARRAY_LEN(_tx.input_bits);
-            transaction_to_roinput(&_tx.roinput, &_tx.tx);
+            roinput.fields = _tx.input_fields;
+            roinput.fields_capacity = ARRAY_LEN(_tx.input_fields);
+            roinput.bits = _tx.input_bits;
+            roinput.bits_capacity = ARRAY_LEN(_tx.input_bits);
+            transaction_to_roinput(&roinput, &_tx.tx);
 
-            sign(&_tx.sig, &_tx.kp, &_tx.roinput, _tx.network_id);
+            sign(&_tx.sig, &kp, &roinput, _tx.network_id);
         }
         FINALLY {
             // Clear private key from memory
-            explicit_bzero((void *)_tx.kp.priv, sizeof(_tx.kp.priv));
+            explicit_bzero((void *)kp.priv, sizeof(kp.priv));
         }
         END_TRY;
     }
