@@ -72,7 +72,9 @@ static void sign_transaction(void)
             roinput.bits_capacity = ARRAY_LEN(_tx.input_bits);
             transaction_to_roinput(&roinput, &_tx.tx);
 
-            sign(&_tx.sig, &kp, &roinput, _tx.network_id);
+            if (!sign(&_tx.sig, &kp, &roinput, _tx.network_id)) {
+                THROW(INVALID_PARAMETER);
+            }
         }
         FINALLY {
             // Clear private key from memory

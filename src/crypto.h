@@ -78,4 +78,4 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key);
 bool generate_address(char *address, const size_t len, const Affine *pub_key);
 bool validate_address(const char *address);
 
-void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id);
+bool sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id);

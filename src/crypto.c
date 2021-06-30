@@ -636,11 +636,12 @@ bool message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *
     return true;
 }
 
-void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id)
+bool sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id)
 {
     Scalar k;
     Affine r;
     Scalar tmp;
+    bool error = false;
 
     BEGIN_TRY {
         TRY {
@@ -668,6 +669,9 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t
             scalar_mul(tmp, sig->s, kp->priv);
             scalar_add(sig->s, k, tmp);
         }
+        CATCH_OTHER(e) {
+            error = true;
+        }
         FINALLY {
             // Clear secrets from memory
             explicit_bzero(tmp, sizeof(tmp));
@@ -675,4 +679,6 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t
         }
         END_TRY;
     }
+
+    return !error;
 }
