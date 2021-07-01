@@ -77,12 +77,14 @@ void handleApdu(volatile unsigned int *flags, volatile unsigned int *tx,
                                    dataLength, flags);
                     break;
 
+#ifdef HAVE_CRYPTO_TESTS
                 case INS_TEST_CRYPTO:
                     handle_test_crypto(G_io_apdu_buffer[OFFSET_P1],
                                        G_io_apdu_buffer[OFFSET_P2],
                                        G_io_apdu_buffer + OFFSET_CDATA,
                                        dataLength, flags);
                     break;
+#endif
 
                 default:
                     THROW(0x6D00);
