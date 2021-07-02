@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:2.0.0-1
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
 
     env:
       NO_EMULATOR: 1
@@ -37,23 +37,6 @@ jobs:
         with:
           name: app-debug
           path: bin
-
-  scan-build:
-    name: Clang Static Analyzer
-    runs-on: ubuntu-latest
-
-    container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:2.0.0-1
-
-    env:
-      NO_EMULATOR: 1
-      NANO_MODEL: nanos
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Get all git tags
-        run: git fetch --prune --unshallow --tags
 
       - name: Build with Clang Static Analyzer
         run: |
@@ -79,8 +62,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt update
-          apt install -qy git netcat
+          apt-get update -q
+          apt-get install -qy git netcat
           pip3 install ledgerblue
 
       - name: Download app binary
