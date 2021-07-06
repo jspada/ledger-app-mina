@@ -186,7 +186,7 @@ bool field_is_odd(const Field y)
     return y[FIELD_BYTES - 1] & 0x01;
 }
 
-static void convert_to_scalar(Scalar a)
+static void scalar_from_bytes(Scalar a)
 {
     // Make sure the scalar is in [0, p)
     //
@@ -513,7 +513,7 @@ void generate_keypair(Keypair *keypair, const uint32_t account)
 
     // Generate private key
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path, BIP32_PATH_LEN, keypair->priv, NULL);
-    convert_to_scalar(keypair->priv);
+    scalar_from_bytes(keypair->priv);
 
     // Generate public key
     generate_pubkey(&keypair->pub, keypair->priv);
@@ -614,7 +614,7 @@ bool message_derive(Scalar out, const Keypair *kp, const ROInput *input, const u
     }
 
     // Convert to scalar
-    convert_to_scalar(out);
+    scalar_from_bytes(out);
 
     return true;
 }
