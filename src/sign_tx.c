@@ -13,11 +13,11 @@ static ui_t _ui;
 
 static void sign_transaction(void)
 {
-    char address[MINA_ADDRESS_LEN];
+    char      address[MINA_ADDRESS_LEN];
     Signature sig;
-    ROInput roinput;
-    Keypair kp;
-    bool error = false;
+    ROInput   roinput;
+    Keypair   kp;
+    bool      error = false;
 
     BEGIN_TRY {
         TRY {
