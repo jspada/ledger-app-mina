@@ -186,14 +186,8 @@ bool field_is_odd(const Field y)
     return y[FIELD_BYTES - 1] & 0x01;
 }
 
-void scalar_from_bytes(Scalar a, const uint8_t *bytes, const size_t len)
+static void convert_to_scalar(Scalar a)
 {
-    if (len != SCALAR_BYTES) {
-        THROW(INVALID_PARAMETER);
-    }
-
-    memmove(a, bytes, SCALAR_BYTES);
-
     // Make sure the scalar is in [0, p)
     //
     // Note: Mina does rejection sampling to obtain a scalar in
@@ -509,10 +503,6 @@ void generate_pubkey(Affine *pub_key, const Scalar priv_key)
 
 void generate_keypair(Keypair *keypair, const uint32_t account)
 {
-    if (!keypair) {
-        THROW(INVALID_PARAMETER);
-    }
-
     const uint32_t bip32_path[BIP32_PATH_LEN] = {
         44      | BIP32_HARDENED_OFFSET,
         12586   | BIP32_HARDENED_OFFSET, // 0x312a
@@ -523,7 +513,7 @@ void generate_keypair(Keypair *keypair, const uint32_t account)
 
     // Generate private key
     os_perso_derive_node_bip32(CX_CURVE_256K1, bip32_path, BIP32_PATH_LEN, keypair->priv, NULL);
-    scalar_from_bytes(keypair->priv, keypair->priv, sizeof(keypair->priv));
+    convert_to_scalar(keypair->priv);
 
     // Generate public key
     generate_pubkey(&keypair->pub, keypair->priv);
@@ -601,12 +591,12 @@ bool validate_address(const char *address)
     return memcmp(raw->checksum, hash2, 4) == 0;
 }
 
-void message_derive(Scalar out, const Keypair *kp, const ROInput *input, const uint8_t network_id)
+bool message_derive(Scalar out, const Keypair *kp, const ROInput *input, const uint8_t network_id)
 {
     uint8_t derive_msg[268] = { };
     int derive_len = roinput_derive_message(derive_msg, sizeof(derive_msg), kp, input, network_id);
     if (derive_len < 0) {
-        THROW(INVALID_PARAMETER);
+        return false;
     }
 
     // blake2b hash
@@ -624,15 +614,17 @@ void message_derive(Scalar out, const Keypair *kp, const ROInput *input, const u
     }
 
     // Convert to scalar
-    scalar_from_bytes(out, out, SCALAR_BYTES);
+    convert_to_scalar(out);
+
+    return true;
 }
 
-void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input, const uint8_t network_id)
+bool message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *input, const uint8_t network_id)
 {
     Field hash_msg[9];
     int hash_msg_len = roinput_hash_message(hash_msg, sizeof(hash_msg), pub, rx, input);
     if (hash_msg_len < 0) {
-        THROW(INVALID_PARAMETER);
+        return false;
     }
 
     // Initial sponge state
@@ -640,18 +632,23 @@ void message_hash(Scalar out, const Affine *pub, const Field rx, const ROInput *
     poseidon_init(pos, network_id);
     poseidon_update(pos, hash_msg, hash_msg_len);
     poseidon_digest(out, pos);
+
+    return true;
 }
 
-void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id)
+bool sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t network_id)
 {
     Scalar k;
     Affine r;
     Scalar tmp;
+    bool error = false;
 
     BEGIN_TRY {
         TRY {
             // k = message_derive(input.fields + kp.pub + input.bits + kp.priv)
-            message_derive(k, kp, input, network_id);
+            if (!message_derive(k, kp, input, network_id)) {
+                THROW(INVALID_PARAMETER);
+            }
 
             // r = k*g
             affine_scalar_mul(&r, k, &AFFINE_ONE);
@@ -664,11 +661,16 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t
             }
 
             // e = message_hash(input + kp.pub + r.x)
-            message_hash(sig->s, &kp->pub, r.x, input, network_id);
+            if (!message_hash(sig->s, &kp->pub, r.x, input, network_id)) {
+                THROW(INVALID_PARAMETER);
+            }
 
             // s = k + e*sk
             scalar_mul(tmp, sig->s, kp->priv);
             scalar_add(sig->s, k, tmp);
+        }
+        CATCH_OTHER(e) {
+            error = true;
         }
         FINALLY {
             // Clear secrets from memory
@@ -677,4 +679,6 @@ void sign(Signature *sig, const Keypair *kp, const ROInput *input, const uint8_t
         }
         END_TRY;
     }
+
+    return !error;
 }

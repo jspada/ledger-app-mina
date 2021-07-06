@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+
+    env:
+      NO_EMULATOR: 1
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get all git tags
+        run: git fetch --prune --unshallow --tags
+
+      - name: Build Nano S app
+        env:
+          NANO_MODEL: nanos
+        run: |
+          make DEBUG=1
+
+      - name: Upload app binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: app-debug-nanos
+          path: bin
+
+      - name: Cleanup the repository
+        run: |
+          git clean -dxf
+
+      - name: Build Nano X app
+        env:
+          NANO_MODEL: nanox
+        run: |
+          make DEBUG=1 BOLOS_SDK=$NANOX_SDK
+
+      - name: Upload app binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: app-debug-nanox
+          path: bin
+
+      - name: Build with Clang Static Analyzer
+        run: |
+          make clean
+          scan-build --use-cc=clang -analyze-headers -enable-checker security -enable-checker unix -enable-checker valist -o scan-build --status-bugs make default
+
+      - uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: scan-build
+          path: scan-build
+
+  test-speculos:
+    name: Run speculos tests
+    needs: build
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/speculos:latest
+      options: --entrypoint /bin/bash
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          apt-get update -q
+          apt-get install -qy git netcat
+          pip3 install ledgerblue
+
+      - name: Download Nano S app binary
+        uses: actions/download-artifact@v2
+        with:
+          name: app-debug-nanos
+          path: bin-nanos
+
+      - name: Download Nano X app binary
+        uses: actions/download-artifact@v2
+        with:
+          name: app-debug-nanox
+          path: bin-nanox
+
+      - name: Run speculos in the background
+        env:
+          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+        run: |
+          /speculos/speculos.py --model nanos --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanos/app.elf 2>speculos.log &
+          echo $! >/tmp/speculos.pid
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
+
+      - name: Run speculos tests against the Nano S app
+        env:
+          LEDGER_PROXY_ADDRESS: 127.0.0.1
+          LEDGER_PROXY_PORT: 9999
+        run: |
+          python3 tests/unit_tests.py
+
+      - name: Kill speculos
+        run: |
+          kill -9 $(cat /tmp/speculos.pid)
+
+      - name: Upload speculos log
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: speculos-nanos-log
+          path: speculos.log
+
+      - name: Run speculos in the background
+        env:
+          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+        run: |
+          /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf 2>speculos.log &
+          echo $! >/tmp/speculos.pid
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
+
+      - name: Run tests against the Nano X app
+        env:
+          LEDGER_PROXY_ADDRESS: 127.0.0.1
+          LEDGER_PROXY_PORT: 9999
+        run: |
+          python3 tests/unit_tests.py
+
+      - name: Upload speculos log
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: speculos-nanox-log
+          path: speculos.log

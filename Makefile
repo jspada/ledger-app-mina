@@ -55,6 +55,7 @@ ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c release),0)
 RELEASE_BUILD=1
 else
 RELEASE_BUILD=0
+DEFINES   += HAVE_CRYPTO_TESTS
 endif
 endif
 

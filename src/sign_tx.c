@@ -6,77 +6,59 @@
 #include "utils.h"
 #include "crypto.h"
 #include "random_oracle_input.h"
-#include "transaction.h"
+#include "parse_tx.h"
 
-// Blockchain instance
-uint8_t _network_id;
-
-// Account variables
-static uint32_t _account;
-static Keypair  _kp;
-static char     _address[MINA_ADDRESS_LEN];
-
-// Transaction related
-static Transaction _tx;
-static Field       _input_fields[3];
-static uint8_t     _input_bits[TX_BITSTRINGS_BYTES];
-static ROInput     _roinput;
-static Signature   _sig;
-
-// UI variables
-static struct ui_t {
-    char from[MINA_ADDRESS_LEN];
-    char to[MINA_ADDRESS_LEN];
-    char amount[32];
-    char fee[32];
-    char total[32];
-    char nonce[32];
-    char valid_until[32];
-    char memo[MEMO_BYTES - 1];
-    char type[11];
-    char from_title[10];
-    char to_title[9];
-} _ui;
-
-static uint8_t set_result_get_signature(void)
-{
-    uint8_t tx = 0;
-    memmove(G_io_apdu_buffer + tx, &_sig, sizeof(_sig));
-    tx += sizeof(_sig);
-    return tx;
-}
+static tx_t _tx;
+static ui_t _ui;
 
 static void sign_transaction(void)
 {
+    char      address[MINA_ADDRESS_LEN];
+    Signature sig;
+    ROInput   roinput;
+    Keypair   kp;
+    bool      error = false;
+
     BEGIN_TRY {
         TRY {
             // Get the account's private key and validate corresponding
             // public key matches the from address
-            generate_keypair(&_kp, _account);
-            if (!generate_address(_address, sizeof(_address), &_kp.pub)) {
+            generate_keypair(&kp, _tx.account);
+            if (!generate_address(address, sizeof(address), &kp.pub)) {
                 THROW(INVALID_PARAMETER);
             }
-            if (memcmp(_address, _ui.from, sizeof(_address)) != 0) {
+            if (memcmp(address, _ui.from, sizeof(address)) != 0) {
                 THROW(INVALID_PARAMETER);
             }
 
             // Create random oracle input from transaction
-            _roinput.fields = _input_fields;
-            _roinput.fields_capacity = ARRAY_LEN(_input_fields);
-            _roinput.bits = _input_bits;
-            _roinput.bits_capacity = ARRAY_LEN(_input_bits);
-            transaction_to_roinput(&_roinput, &_tx);
+            roinput.fields = _tx.input_fields;
+            roinput.fields_capacity = ARRAY_LEN(_tx.input_fields);
+            roinput.bits = _tx.input_bits;
+            roinput.bits_capacity = ARRAY_LEN(_tx.input_bits);
+            transaction_to_roinput(&roinput, &_tx.tx);
 
-            sign(&_sig, &_kp, &_roinput, _network_id);
+            if (!sign(&sig, &kp, &roinput, _tx.network_id)) {
+                THROW(INVALID_PARAMETER);
+            }
+        }
+        CATCH_OTHER(e) {
+            error = true;
         }
         FINALLY {
             // Clear private key from memory
-            explicit_bzero((void *)_kp.priv, sizeof(_kp.priv));
+            explicit_bzero((void *)kp.priv, sizeof(kp.priv));
         }
         END_TRY;
     }
 
-    sendResponse(set_result_get_signature(), true);
+    if (error) {
+        THROW(INVALID_PARAMETER);
+    }
+
+    memmove(G_io_apdu_buffer, &sig, sizeof(sig));
+
+    sendResponse(sizeof(sig), true);
 }
 
 UX_STEP_NOCB_INIT(
@@ -513,102 +495,28 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *dataBuffer,
     UNUSED(p1);
     UNUSED(p2);
 
-    if (dataLength != 172) {
-        THROW(INVALID_PARAMETER);
-    }
-
-    // 0-3: from_bip44_account
-    _account = read_uint32_be(dataBuffer);
-
-    // 4-58: from_address
-    memcpy(_ui.from, dataBuffer + 4, MINA_ADDRESS_LEN - 1);
-    _ui.from[MINA_ADDRESS_LEN - 1] = '\0';
-    if (!validate_address(_ui.from)) {
-        THROW(INVALID_PARAMETER);
-    }
-    read_public_key_compressed(&_tx.source_pk, _ui.from);
-
-    // Always the same as from for sent-payment and delegate txs
-    read_public_key_compressed(&_tx.fee_payer_pk, _ui.from);
-
-    // 59-113: to
-    memcpy(_ui.to, dataBuffer + 59, MINA_ADDRESS_LEN - 1);
-    _ui.to[MINA_ADDRESS_LEN - 1] = '\0';
-    if (!validate_address(_ui.to)) {
-        THROW(INVALID_PARAMETER);
-    }
-    read_public_key_compressed(&_tx.receiver_pk, _ui.to);
-
-    // 114-121: amount
-    _tx.amount = read_uint64_be(dataBuffer + 114);
-    amount_to_string(_ui.amount, sizeof(_ui.amount), _tx.amount);
-
-    // Set to 1 until token support is released
-    _tx.token_id = 1;
-
-    // 122-129: fee
-    _tx.fee = read_uint64_be(dataBuffer + 122);
-    amount_to_string(_ui.fee, sizeof(_ui.fee), _tx.fee);
-
-    // UI total
-    if (_tx.amount + _tx.fee < _tx.amount) {
-        // Overflow
-        THROW(INVALID_PARAMETER);
-    }
-    amount_to_string(_ui.total, sizeof(_ui.total), _tx.amount + _tx.fee);
-
-    // Set to 1 until token support is released
-    _tx.fee_token = 1;
-
-    // 130-133: nonce
-    _tx.nonce = read_uint32_be(dataBuffer + 130);
-    value_to_string(_ui.nonce, sizeof(_ui.nonce), _tx.nonce);
-
-    // 134-137: valid_until
-    _tx.valid_until = read_uint32_be(dataBuffer + 134);
-    value_to_string(_ui.valid_until, sizeof(_ui.valid_until), _tx.valid_until);
-
-    // Fixed until token support is released
-    _tx.token_locked = false;
-
-    // 138-169: memo
-    memcpy(_ui.memo, dataBuffer + 138, sizeof(_ui.memo) - 1);
-    _ui.memo[sizeof(_ui.memo) - 1] = '\0';
-    transaction_prepare_memo(_tx.memo, _ui.memo);
-
-    // 170: tag
-    uint8_t tag = *(dataBuffer + 170);
-    if (tag != PAYMENT_TX && tag != DELEGATION_TX) {
-        THROW(INVALID_PARAMETER);
-    }
-    _tx.tag[0] = tag & 0x01;
-    _tx.tag[1] = tag & 0x02;
-    _tx.tag[2] = tag & 0x04;
-
-    // 171: network_id
-    _network_id = *(dataBuffer + 171);
-    if (_network_id != TESTNET_ID && _network_id != MAINNET_ID) {
+    if (!parse_tx(dataBuffer, dataLength, &_tx, &_ui)) {
         THROW(INVALID_PARAMETER);
     }
 
     #ifdef HAVE_ON_DEVICE_UNIT_TESTS
         ux_flow_init(0, ux_sign_tx_unit_test_flow, NULL);
     #else
-        if (tag == PAYMENT_TX) {
+        if (_tx.tag == PAYMENT_TX) {
             strncpy(_ui.type, "Payment", sizeof(_ui.type));
             strncpy(_ui.from_title, "Sender", sizeof(_ui.from_title));
             strncpy(_ui.to_title, "Receiver", sizeof(_ui.to_title));
         }
-        else if (tag == DELEGATION_TX) {
+        else if (_tx.tag == DELEGATION_TX) {
             strncpy(_ui.type, "Delegation", sizeof(_ui.type));
             strncpy(_ui.from_title, "Delegator", sizeof(_ui.from_title));
             strncpy(_ui.to_title, "Delegate", sizeof(_ui.to_title));
         }
 
         // Select the appropriate UX flow
-        int n_idx = _network_id == MAINNET_ID;
-        int t_idx = tag == DELEGATION_TX;
-        int v_idx = _tx.valid_until != (uint32_t)-1;
+        int n_idx = _tx.network_id == MAINNET_ID;
+        int t_idx = _tx.tag == DELEGATION_TX;
+        int v_idx = _tx.tx.valid_until != (uint32_t)-1;
         int m_idx = _ui.memo[0] != '\0';
 
         // Run the UX flow
