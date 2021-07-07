@@ -49,13 +49,13 @@ all: default stop_emulator test
 
 # Set DEFINES and convenience helper based on environmental flags
 ifneq ("$(RELEASE_BUILD)","")
-RELEASE_BUILD=1
+RELEASE_BUILD=0
+DEFINES   += HAVE_CRYPTO_TESTS
 else
 ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c release),0)
 RELEASE_BUILD=1
 else
-RELEASE_BUILD=0
-DEFINES   += HAVE_CRYPTO_TESTS
+RELEASE_BUILD=1
 endif
 endif
 
@@ -84,7 +84,7 @@ EMULATOR=0
 endif
 
 ifeq ("$(EMULATOR_SDK)","")
-ifeq ("$(NANO_MODEL)","nanox")
+ifeq ($(TARGET_NAME),TARGET_NANOX)
 EMULATOR_SDK=1.2
 else
 EMULATOR_SDK=2.0
