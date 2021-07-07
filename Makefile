@@ -348,13 +348,13 @@ release: all
 	@rm -f mina_ledger_wallet
 
 load: all
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 load-offline: all
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
+	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
 
 delete:
-	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
+	python3 -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 dev-env/speculos/build/src/launcher: dev-env/speculos
 ifeq ($(EMULATOR),1)
@@ -373,7 +373,7 @@ ifneq (,$(wildcard emulator.pid))
 endif
 
 test:
-	$(MAKE) -C tests
+	$(MAKE) -C tests TARGET_NAME=$(TARGET_NAME)
 
 TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
               elegant kitchen state purpose matrix gas grid enable frown road \

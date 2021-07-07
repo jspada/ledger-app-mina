@@ -5,7 +5,7 @@ EMULATOR=0
 endif
 
 ifeq ("$(EMULATOR_SDK)","")
-ifeq ("$(NANO_MODEL)","nanox")
+ifeq ($(TARGET_NAME),TARGET_NANOX)
 EMULATOR_SDK=1.2
 else
 EMULATOR_SDK=2.0
@@ -18,16 +18,12 @@ else
 EMULATOR_TESTS=0
 endif
 
-ifeq ("$(NANO_MODEL)","nanos")
+ifeq ($(TARGET_NAME),TARGET_NANOS)
 EMULATOR_MODEL=nanos
 endif
 
-ifeq ("$(NANO_MODEL)","nanox")
+ifeq ($(TARGET_NAME),TARGET_NANOX)
 EMULATOR_MODEL=nanox
-endif
-
-ifeq ("$(EMULATOR_MODEL)","")
-$(error Unknown NANO_MODEL '$(NANO_MODEL)')
 endif
 
 ifeq ("$(EMULATOR_MODEL)","")
@@ -74,7 +70,7 @@ TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
 			  goddess glove canyon key
 
 ifeq ($(EMULATOR_TESTS),1)
-ifeq ("$(EMULATOR_MODEL)","nanox")
+ifeq ($(EMULATOR_MODEL),TARGET_NANOX)
 $(warning Emulator automation is not supported on the Nano X, reverting to manual unit tests)
 EMULATOR_AUTOMATION=
 EMULATOR_DISPLAY=
