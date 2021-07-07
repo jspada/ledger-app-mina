@@ -70,11 +70,6 @@ TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
 			  goddess glove canyon key
 
 ifeq ($(EMULATOR_TESTS),1)
-ifeq ($(EMULATOR_MODEL),TARGET_NANOX)
-$(warning Emulator automation is not supported on the Nano X, reverting to manual unit tests)
-EMULATOR_AUTOMATION=
-EMULATOR_DISPLAY=
-else
 EMULATOR_AUTOMATION=--automation file:../emulator_automation.json
 EMULATOR_DISPLAY=--display headless
 endif
