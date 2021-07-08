@@ -14,3 +14,4 @@ tests/emulator_tests
 tests/emulator_tests.log
 emulator.log
 emulator.pid
+tests/__pycache__/
