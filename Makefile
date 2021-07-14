@@ -48,7 +48,7 @@ all: default stop_emulator test
 ############
 
 # Set DEFINES and convenience helper based on environmental flags
-ifeq ("$(RELEASE_BUILD)","0"))
+ifeq ($(RELEASE_BUILD),0)
 DEFINES += HAVE_CRYPTO_TESTS
 else
 RELEASE_BUILD=1
