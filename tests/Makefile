@@ -1,7 +1,20 @@
+ifeq ($(RELEASE_BUILD),)
+RELEASE_BUILD=1
+endif
+
 ifeq ("$(NO_EMULATOR)","")
 EMULATOR=1
 else
 EMULATOR=0
+endif
+
+ifeq ($(TARGET_NAME),)
+ifeq ("$(NANO_MODEL)", "nanos")
+TARGET_NAME=TARGET_NANOS
+endif
+ifeq ("$(NANO_MODEL)", "nanox")
+TARGET_NAME=TARGET_NANOX
+endif
 endif
 
 ifeq ("$(EMULATOR_SDK)","")
@@ -24,6 +37,18 @@ endif
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 EMULATOR_MODEL=nanox
+endif
+
+ifeq ($(RELEASE_BUILD), 1)
+RELEASE_BUILD_TEST_ARGS=
+else
+RELEASE_BUILD_TEST_ARGS=--kind all
+endif
+
+ifeq ("$(EMULATOR_MODEL)","")
+ifneq ("$(NANO_MODEL)", "")
+EMULATOR_MODEL=$(NANO_MODEL)
+endif
 endif
 
 ifeq ("$(EMULATOR_MODEL)","")
@@ -58,12 +83,6 @@ transaction.o: $(wildcard ../src/*.h) $(wildcard ../src/*.c)
 ifneq (,$(wildcard ../emulator.pid))
 EMULATOR_PID=`cat ../emulator.pid`
 endif
-# stop_emulator:
-# ifneq (,$(wildcard ../emulator.pid))
-# 	@echo "Stopping emulator with PID $(EMULATOR_PID)"
-# 	@kill $(EMULATOR_PID) >/dev/null 2>&1 || true
-# 	@rm -f ../emulator.pid
-# endif
 
 TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
               elegant kitchen state purpose matrix gas grid enable frown road \
@@ -83,7 +102,7 @@ echo "Starting $(EMULATOR_MODEL) emulator"
 PID1=$$!
 echo $$PID1 > ../emulator.pid
 sleep 1
-LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PORT=9999 ./unit_tests.py
+LEDGER_PROXY_ADDRESS=127.0.0.1 LEDGER_PROXY_PORT=9999 ./unit_tests.py $(RELEASE_BUILD_TEST_ARGS)
 RES=$$?
 echo "Stopping emulator on pid $$PID1"
 kill $${PID1} > /dev/null 2>&1 || true

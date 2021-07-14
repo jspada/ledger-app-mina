@@ -48,15 +48,10 @@ all: default stop_emulator test
 ############
 
 # Set DEFINES and convenience helper based on environmental flags
-ifneq ("$(RELEASE_BUILD)","")
-RELEASE_BUILD=0
-DEFINES   += HAVE_CRYPTO_TESTS
-else
-ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c release),0)
-RELEASE_BUILD=1
+ifeq ("$(RELEASE_BUILD)","0"))
+DEFINES += HAVE_CRYPTO_TESTS
 else
 RELEASE_BUILD=1
-endif
 endif
 
 ifneq ("$(ON_DEVICE_UNIT_TESTS)","")
@@ -297,25 +292,25 @@ read -p "Please unlock your Ledger device and exit any apps (press any key to co
 endef
 export RELEASE_DEPS
 
-release: all
+side_release: all
 	@# Must force clean like this because Ledger makefile always runs first
 	@echo
-	@echo "RELEASE BUILD: Forcing clean"
+	@echo "SIDE RELEASE BUILD: Forcing clean"
 	@echo
 	$(MAKE) clean
 
 	@# Make sure unit tests are run with stack canary
 	@echo
-	@echo "RELEASE BUILD: Building with HAVE_BOLOS_APP_STACK_CANARY for unit tests"
+	@echo "SIDE RELEASE BUILD: Building with HAVE_BOLOS_APP_STACK_CANARY for unit tests"
 	@echo
-	@NO_STACK_CANARY= NO_EMULATOR= NO_EMULATOR_TEST= ON_DEVICE_UNIT_TESTS= $(MAKE) all
+	@RELEASE_BUILD=0 NO_STACK_CANARY= NO_EMULATOR= NO_EMULATOR_TEST= ON_DEVICE_UNIT_TESTS= $(MAKE) all
 
 	@# Build release without stack canary
 	@$(MAKE) clean
 	@echo
-	@echo "RELEASE BUILD: Building without HAVE_BOLOS_APP_STACK_CANARY"
+	@echo "SIDE RELEASE BUILD: Building without HAVE_BOLOS_APP_STACK_CANARY"
 	@echo
-	@RELEASE_BUILD=1 NO_STACK_CANARY=1 $(MAKE) all
+	@NO_STACK_CANARY=1 $(MAKE) all
 
 	@echo "Packaging release... ledger-app-mina-$(VERSION_TAG).tar.gz"
 
@@ -374,7 +369,7 @@ ifneq (,$(wildcard emulator.pid))
 endif
 
 test:
-	$(MAKE) -C tests TARGET_NAME=$(TARGET_NAME)
+	$(MAKE) -C tests TARGET_NAME=$(TARGET_NAME) RELEASE_BUILD=$(RELEASE_BUILD)
 
 TEST_MNEMONIC=course grief vintage slim tell hospital car maze model style \
               elegant kitchen state purpose matrix gas grid enable frown road \
@@ -387,9 +382,6 @@ endif
 endif
 
 ifeq ($(AUTOMATION),1)
-ifeq ($(TARGET_NAME),TARGET_NANOX)
-$(error Emulator automation is not supported on the Nano X)
-endif
 EMULATOR_AUTOMATION=--automation file:./emulator_automation.json
 else
 EMULATOR_AUTOMATION=

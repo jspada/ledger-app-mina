@@ -81,7 +81,7 @@ jobs:
         run: |
           apt-get update -q
           apt-get install -qy git netcat
-          pip3 install ledgerblue
+          pip3 install ledgerblue pytest
 
       - name: Download Nano S app binary
         uses: actions/download-artifact@v2

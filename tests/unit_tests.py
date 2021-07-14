@@ -11,8 +11,8 @@ import mina_ledger_wallet as mina
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--kind', help="Kind of tests to run (all, crypto, fuzz, get-address, sign-transaction)",
-                    choices = ["all", "crypto", "fuzz", "get-address", "sign-transaction"], default="all")
+    parser.add_argument('--kind', help="Kind of tests to run (all, release, crypto, fuzz, get-address, sign-transaction)",
+                    choices = ["all", "release", "crypto", "fuzz", "get-address", "sign-transaction"], default="release")
     args = parser.parse_args()
 
 mina.ledger_init()
@@ -38,6 +38,7 @@ def sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee,
         return False
 
 class TestCrypto:
+    @pytest.mark.all
     def test(self):
         assert(mina.ledger_crypto_tests())
 
@@ -450,8 +451,9 @@ class TestFuzz:
         assert(not send_apdu("e0030000ab00000000423632716e7a62586d524e6f397133326e34534e75326d70423865374659594c48384e6d6158366f464342596a6a513853624437757a56423632716963697059787945487537516a557153375176426970547335437a676b595a5a5a6b506f4b5659427536746e44556345395a7400000192906e4a00000000007735940000000010000425d448656c6c6f204d696e612100000000000000000000000000000000000000000003"))
 
 def run_crypto_tests():
+    print("Running crypto unit tests (not for release builds)")
     t0 = time.time()
-    TestCrypto.test(None)
+    _TestCrypto.test(None)
     # Performance report
     duration = time.time() - t0
     print("Performed crypto tests in {:0.03f} seconds".format(duration))
@@ -482,6 +484,10 @@ if __name__ == "__main__":
     try:
         if args.kind == "all":
             run_crypto_tests()
+            run_get_address_tests()
+            run_signature_tests()
+            run_fuzz_tests()
+        if args.kind == "release":
             run_get_address_tests()
             run_signature_tests()
             run_fuzz_tests()

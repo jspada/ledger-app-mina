@@ -228,7 +228,7 @@ unsigned char io_event(unsigned char channel) {
         case SEPROXYHAL_TAG_TICKER_EVENT:
             UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer,
             {
-#ifndef TARGET_NANOX
+            #ifndef TARGET_NANOX
                 if (UX_ALLOWED) {
                     if (ux_step_count) {
                     // prepare next screen
@@ -237,7 +237,7 @@ unsigned char io_event(unsigned char channel) {
                     UX_REDISPLAY();
                     }
                 }
-#endif // TARGET_NANOX
+            #endif // TARGET_NANOX
             });
             break;
     }
