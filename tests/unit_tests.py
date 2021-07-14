@@ -453,7 +453,7 @@ class TestFuzz:
 def run_crypto_tests():
     print("Running crypto unit tests (not for release builds)")
     t0 = time.time()
-    _TestCrypto.test(None)
+    TestCrypto.test(None)
     # Performance report
     duration = time.time() - t0
     print("Performed crypto tests in {:0.03f} seconds".format(duration))

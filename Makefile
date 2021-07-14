@@ -48,6 +48,12 @@ all: default stop_emulator test
 ############
 
 # Set DEFINES and convenience helper based on environmental flags
+ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c side_release),0)
+ifeq ($(RELEASE_BUILD),0)
+RELEASE_BUILD=1
+endif
+endif
+
 ifeq ($(RELEASE_BUILD),0)
 DEFINES += HAVE_CRYPTO_TESTS
 else
@@ -198,26 +204,14 @@ endif
 ifneq ($(shell echo $(DEFINES) | grep -c HAVE_ON_DEVICE_UNIT_TESTS),0)
 $(error HAVE_ON_DEVICE_UNIT_TESTS should not be used for release builds);
 endif
-ifeq ($(EMULATOR),0)
-$(error NO_EMULATOR should not be used for release builds);
-endif
-ifeq ($(EMULATOR_TESTS),0)
-$(error NO_EMULATOR_TESTS should not be used for release builds);
-endif
 endif
 
-ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c release),0)
-ifneq ($(shell echo $(DEFINES) | grep -c HAVE_BOLOS_APP_STACK_CANARY),0)
-$(error HAVE_BOLOS_APP_STACK_CANARY should not be used for release builds);
-endif
-ifneq ($(shell echo $(DEFINES) | grep -c HAVE_ON_DEVICE_UNIT_TESTS),0)
-$(error HAVE_ON_DEVICE_UNIT_TESTS should not be used for release builds);
-endif
+ifneq ($(shell echo "$(MAKECMDGOALS)" | grep -c side_release),0)
 ifeq ($(EMULATOR),0)
-$(error NO_EMULATOR should not be used for release builds);
+$(error NO_EMULATOR should not be used for side release builds);
 endif
 ifeq ($(EMULATOR_TESTS),0)
-$(error NO_EMULATOR_TESTS should not be used for release builds);
+$(error NO_EMULATOR_TESTS should not be used for side release builds);
 endif
 endif
 
