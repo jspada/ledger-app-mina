@@ -3,9 +3,9 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -81,7 +81,8 @@ jobs:
         run: |
           apt-get update -q
           apt-get install -qy git netcat
-          pip3 install ledgerblue pytest
+          pip3 install ledgerblue
+          pip3 install pytest
 
       - name: Download Nano S app binary
         uses: actions/download-artifact@v2
