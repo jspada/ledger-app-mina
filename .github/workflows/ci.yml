@@ -112,16 +112,16 @@ jobs:
       #     cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
       #     python3 tests/unit_tests.py
 
-      - name: Kill speculos
-        run: |
-          kill -9 $(cat /tmp/speculos.pid)
+      # - name: Kill speculos
+      #   run: |
+      #     kill -9 $(cat /tmp/speculos.pid)
 
-      - name: Upload speculos log
-        uses: actions/upload-artifact@v2
-        if: failure()
-        with:
-          name: speculos-nanos-log
-          path: speculos.log
+      # - name: Upload speculos log
+      #   uses: actions/upload-artifact@v2
+      #   if: failure()
+      #   with:
+      #     name: speculos-nanos-log
+      #     path: speculos.log
 
       - name: Run speculos in the background
         env:
