@@ -96,21 +96,21 @@ jobs:
           name: app-debug-nanox
           path: bin-nanox
 
-      - name: Run speculos in the background
-        env:
-          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
-        run: |
-          /speculos/speculos.py --model nanos --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanos/app.elf 2>speculos.log &
-          echo $! >/tmp/speculos.pid
-          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
+      # - name: Run speculos in the background
+      #   env:
+      #     SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+      #   run: |
+      #     /speculos/speculos.py --model nanos --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanos/app.elf 2>speculos.log &
+      #     echo $! >/tmp/speculos.pid
+      #     timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
 
-      - name: Run speculos tests against the Nano S app
-        env:
-          LEDGER_PROXY_ADDRESS: 127.0.0.1
-          LEDGER_PROXY_PORT: 9999
-        run: |
-          cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
-          python3 tests/unit_tests.py
+      # - name: Run speculos tests against the Nano S app
+      #   env:
+      #     LEDGER_PROXY_ADDRESS: 127.0.0.1
+      #     LEDGER_PROXY_PORT: 9999
+      #   run: |
+      #     cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
+      #     python3 tests/unit_tests.py
 
       - name: Kill speculos
         run: |
@@ -123,13 +123,13 @@ jobs:
           name: speculos-nanos-log
           path: speculos.log
 
-      # - name: Run speculos in the background
-      #   env:
-      #     SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
-      #   run: |
-      #     /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf 2>speculos.log &
-      #     echo $! >/tmp/speculos.pid
-      #     timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
+      - name: Run speculos in the background
+        env:
+          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+        run: |
+          /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf 2>speculos.log &
+          echo $! >/tmp/speculos.pid
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
 
       - name: Run tests against the Nano X app
         env:
