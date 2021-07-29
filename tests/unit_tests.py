@@ -1,46 +1,58 @@
 #!/usr/bin/env python3
 
+import mina_ledger_wallet as mina
 import pytest
 import argparse
 import sys
 import os
 import time
 
+print("hi")
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../utils/")
-import mina_ledger_wallet as mina
 
 if __name__ == "__main__":
+    print("how")
     parser = argparse.ArgumentParser()
     parser.add_argument('--kind', help="Kind of tests to run (all, release, crypto, fuzz, get-address, sign-transaction)",
-                    choices = ["all", "release", "crypto", "fuzz", "get-address", "sign-transaction"], default="release")
+                        choices=["all", "release", "crypto", "fuzz", "get-address", "sign-transaction"], default="release")
     args = parser.parse_args()
+    print("are")
 
+print("init")
 mina.ledger_init()
+print("after init")
+
 
 def send_apdu(adpu_hex):
+    print("apdu")
     try:
         return mina.ledger_send_apdu(adpu_hex)
     except:
         return False
 
+
 def get_address(account_number):
+    print("get address")
     try:
         return mina.ledger_get_address(account_number)
     except:
         return False
 
+
 def sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee,
-                 nonce, valid_until, memo, network_id):
+            nonce, valid_until, memo, network_id):
     try:
         return mina.ledger_sign_tx(tx_type, sender_account, sender_address, receiver,
                                    amount, fee, nonce, valid_until, memo, network_id)
     except:
         return False
 
+
 class TestCrypto:
     @pytest.mark.all
     def test(self):
         assert(mina.ledger_crypto_tests())
+
 
 class TestGetAddress:
     def test(self):
@@ -53,27 +65,34 @@ class TestGetAddress:
 
         # account 0
         # private key 164244176fddb5d769b7de2027469d027ad428fadcc0c02396e6280142efb718
-        assert(get_address(0) == "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV")
+        assert(get_address(0) ==
+               "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV")
 
         # account 1
         # private key 3ca187a58f09da346844964310c7e0dd948a9105702b716f4d732e042e0c172e
-        assert(get_address(1) == "B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt")
+        assert(get_address(1) ==
+               "B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt")
 
         # account 2
         # private key 336eb4a19b3d8905824b0f2254fb495573be302c17582748bf7e101965aa4774
-        assert(get_address(2) == "B62qrKG4Z8hnzZqp1AL8WsQhQYah3quN1qUj3SyfJA8Lw135qWWg1mi")
+        assert(get_address(2) ==
+               "B62qrKG4Z8hnzZqp1AL8WsQhQYah3quN1qUj3SyfJA8Lw135qWWg1mi")
 
         # account 3
         # private key 1dee867358d4000f1dafa5978341fb515f89eeddbe450bd57df091f1e63d4444
-        assert(get_address(3) == "B62qoqiAgERjCjXhofXiD7cMLJSKD8hE8ZtMh4jX5MPNgKB4CFxxm1N")
+        assert(get_address(3) ==
+               "B62qoqiAgERjCjXhofXiD7cMLJSKD8hE8ZtMh4jX5MPNgKB4CFxxm1N")
 
         # account 49370
         # private key 20f84123a26e58dd32b0ea3c80381f35cd01bc22a20346cc65b0a67ae48532ba
-        assert(get_address(49370) == "B62qkiT4kgCawkSEF84ga5kP9QnhmTJEYzcfgGuk6okAJtSBfVcjm1M")
+        assert(get_address(49370) ==
+               "B62qkiT4kgCawkSEF84ga5kP9QnhmTJEYzcfgGuk6okAJtSBfVcjm1M")
 
         # account 0x312a
         # private key 3414fc16e86e6ac272fda03cf8dcb4d7d47af91b4b726494dab43bf773ce1779
-        assert(get_address(0x312a) == "B62qoG5Yk4iVxpyczUrBNpwtx2xunhL48dydN53A2VjoRwF8NUTbVr4")
+        assert(get_address(0x312a) ==
+               "B62qoG5Yk4iVxpyczUrBNpwtx2xunhL48dydN53A2VjoRwF8NUTbVr4")
+
 
 class TestSignTx:
     def test(self):
@@ -328,7 +347,8 @@ class TestSignTx:
                        16,
                        271828,
                        "Hello Mina!",
-                       mina.TESTNET_ID));
+                       mina.TESTNET_ID))
+
 
 class TestFuzz:
     def test(self):
@@ -345,7 +365,8 @@ class TestFuzz:
         assert(not send_apdu("b08fdaeeb08fdaee6e8f58de53c7f54e3b86ef06d646e0c28173ab524cf21297eed41c870346760ecee46558de53c7f5b08fdaee6e8f58de53c7f54e3b86e119a24cf21f06d646e0c28173ab5465b08fdaee6e8f58de53c7f54e3b86e119a24cf21297eed41c8703467652279a3e7ec598ef6f06d646e0c28173ab57f897719eb5db73b16043bc7cc0c94cf21297eed41c870346760ecee465"))
 
         # Invalid message 5
-        assert(not send_apdu("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+        assert(not send_apdu(
+            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
 
         # Invalid command
         assert(not send_apdu("01f600000400000000"))
@@ -450,6 +471,7 @@ class TestFuzz:
         # Invalid sign tx (invalid tx type)
         assert(not send_apdu("e0030000ab00000000423632716e7a62586d524e6f397133326e34534e75326d70423865374659594c48384e6d6158366f464342596a6a513853624437757a56423632716963697059787945487537516a557153375176426970547335437a676b595a5a5a6b506f4b5659427536746e44556345395a7400000192906e4a00000000007735940000000010000425d448656c6c6f204d696e612100000000000000000000000000000000000000000003"))
 
+
 def run_crypto_tests():
     print("Running crypto unit tests (not for release builds)")
     t0 = time.time()
@@ -458,25 +480,31 @@ def run_crypto_tests():
     duration = time.time() - t0
     print("Performed crypto tests in {:0.03f} seconds".format(duration))
 
+
 def run_get_address_tests():
     t0 = time.time()
     TestGetAddress.test(None)
     # Performance report
     duration = time.time() - t0
-    print("Performed 6 get-address operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/6.0))
+    print(
+        "Performed 6 get-address operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/6.0))
+
 
 def run_signature_tests():
     t0 = time.time()
     TestSignTx.test(None)
     # Performance report
     duration = time.time() - t0
-    print("Performed 18 sign-tx operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/18.0))
+    print("Performed 18 sign-tx operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(
+        duration, duration/18.0))
+
 
 def run_fuzz_tests():
     t0 = time.time()
     TestFuzz.test(None)
     duration = time.time() - t0
     print("Performed fuzz tests in {:0.03f} seconds".format(duration))
+
 
 if __name__ == "__main__":
     print("Running unit tests...")
