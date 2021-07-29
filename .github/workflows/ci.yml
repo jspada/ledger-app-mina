@@ -123,13 +123,13 @@ jobs:
           name: speculos-nanos-log
           path: speculos.log
 
-      - name: Run speculos in the background
-        env:
-          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
-        run: |
-          /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf 2>speculos.log &
-          echo $! >/tmp/speculos.pid
-          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
+      # - name: Run speculos in the background
+      #   env:
+      #     SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+      #   run: |
+      #     /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf 2>speculos.log &
+      #     echo $! >/tmp/speculos.pid
+      #     timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
 
       - name: Run tests against the Nano X app
         env:
