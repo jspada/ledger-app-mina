@@ -2,6 +2,9 @@
     "version": 1,
     "rules": [
         {
+            "toto": "tata"
+        },
+        {
             "regexp": "(Address|[\\s\\w\\n]*Get\\nAddress|Sign\\nTransaction|Transaction|Path|Network|Type|Sender|Receive|Delegator|Delegate|Amount|Fee|Total|Nonce|Valid until|Memo).*",
             "actions": [
                 [ "button", 2, true ],
