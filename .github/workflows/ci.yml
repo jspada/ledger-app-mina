@@ -127,7 +127,7 @@ jobs:
         env:
           SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
         run: |
-          /speculos/speculos.py --log-level speculos:DEBUG --model nanox --display headless --seed "${SEED}" bin-nanox/app.elf &
+          /speculos/speculos.py --log-level speculos:DEBUG --log-level automation:DEBUG --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf &
           echo $! >/tmp/speculos.pid
           timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do echo 'hi' && sleep 1; done'
 
@@ -137,7 +137,6 @@ jobs:
           LEDGER_PROXY_PORT: 9999
         run: |
           cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
-          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do echo 'hey' && sleep 1; done'
           python3 tests/unit_tests.py
 
       - name: Upload speculos log
