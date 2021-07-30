@@ -19,9 +19,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("are")
 
-# print("init")
-# mina.ledger_init()
-# print("after init")
+print("init")
+mina.ledger_init()
+print("after init")
 
 
 # def send_apdu(adpu_hex):
@@ -507,8 +507,8 @@ if __name__ == "__main__":
 #     print("Performed fuzz tests in {:0.03f} seconds".format(duration))
 
 
-# if __name__ == "__main__":
-#     print("Running unit tests...")
+if __name__ == "__main__":
+    print("Running unit tests...")
 
 #     try:
 #         if args.kind == "all":
@@ -534,4 +534,4 @@ if __name__ == "__main__":
 #         print("{}".format(ex))
 #         sys.exit(233)
 
-#     print("Completed unit tests successfully!")
+print("Completed unit tests successfully!")
