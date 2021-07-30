@@ -137,6 +137,7 @@ jobs:
           LEDGER_PROXY_PORT: 9999
         run: |
           cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do echo 'hey' && sleep 1; done'
           python3 tests/unit_tests.py
 
       - name: Upload speculos log
