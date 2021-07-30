@@ -8,18 +8,16 @@ import os
 import time
 
 print("hi")
-# sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../utils/")
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../utils/")
+
 
 if __name__ == "__main__":
-    print("rekt")
-
-# if __name__ == "__main__":
-#     print("how")
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--kind', help="Kind of tests to run (all, release, crypto, fuzz, get-address, sign-transaction)",
-#                         choices=["all", "release", "crypto", "fuzz", "get-address", "sign-transaction"], default="release")
-#     args = parser.parse_args()
-#     print("are")
+    print("how")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--kind', help="Kind of tests to run (all, release, crypto, fuzz, get-address, sign-transaction)",
+                        choices=["all", "release", "crypto", "fuzz", "get-address", "sign-transaction"], default="release")
+    args = parser.parse_args()
+    print("are")
 
 # print("init")
 # mina.ledger_init()
