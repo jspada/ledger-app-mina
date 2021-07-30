@@ -137,7 +137,7 @@ jobs:
           LEDGER_PROXY_PORT: 9999
         run: |
           cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
-          python3 -c 'print("hi python")'
+          python3 tests/unit_tests.py
 
       - name: Upload speculos log
         uses: actions/upload-artifact@v2
