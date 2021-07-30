@@ -57,7 +57,6 @@ def get_address(account_number):
 
 class TestGetAddress:
     def test(self):
-        return None
         # Address generation tests
         #
         #     These tests were automatically generated from the Mina c-reference-signer
