@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# import mina_ledger_wallet as mina
+import mina_ledger_wallet as mina
 import pytest
 import argparse
 import sys
