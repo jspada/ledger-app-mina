@@ -484,7 +484,7 @@ class TestGetAddress:
 
 def run_get_address_tests():
     t0 = time.time()
-    TestGetAddress.test(None)
+    # TestGetAddress.test(None)
     # Performance report
     duration = time.time() - t0
     print(
