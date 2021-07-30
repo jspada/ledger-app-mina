@@ -137,6 +137,9 @@ jobs:
           LEDGER_PROXY_PORT: 9999
         run: |
           cp utils/mina_ledger_wallet.py tests/mina_ledger_wallet.py
+          echo $LEDGER_PROXY_ADDRESS
+          echo $LEDGER_PROXY_PORT
+          echo $NO_EMULATOR
           python3 tests/unit_tests.py
 
       - name: Upload speculos log
