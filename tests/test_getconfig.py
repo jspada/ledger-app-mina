@@ -16,12 +16,11 @@ apdu = bytearray.fromhex(apduMessage)
 print("~~ Ledger Boilerplate ~~")
 print("Check Configuration")
 
-dongle = getDongle(True)
+dongle = getDongle(debug=False)
 result = dongle.exchange(apdu)
 
-print("N_storage.dummy_setting_1 : " +  '{:02x}' .format(result[0]))
-print("N_storage.dummy_setting_2 : " +  '{:02x}' .format(result[1]))
-print("LEDGER_MAJOR_VERSION      : " +  '{:02x}' .format(result[2]))
-print("LEDGER_MINOR_VERSION      : " +  '{:02x}' .format(result[3]))
-print("LEDGER_PATCH_VERSION      : " +  '{:02x}' .format(result[4]))
-
+print("N_storage.dummy_setting_1 : " + '{:02x}' .format(result[0]))
+print("N_storage.dummy_setting_2 : " + '{:02x}' .format(result[1]))
+print("LEDGER_MAJOR_VERSION      : " + '{:02x}' .format(result[2]))
+print("LEDGER_MINOR_VERSION      : " + '{:02x}' .format(result[3]))
+print("LEDGER_PATCH_VERSION      : " + '{:02x}' .format(result[4]))
