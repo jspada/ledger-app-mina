@@ -32,12 +32,12 @@ print("after init")
 #         return False
 
 
-# def get_address(account_number):
-#     print("get address")
-#     try:
-#         return mina.ledger_get_address(account_number)
-#     except:
-#         return False
+def get_address(account_number):
+    print("get address")
+    try:
+        return mina.ledger_get_address(account_number)
+    except:
+        return False
 
 
 # def sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee,
@@ -55,44 +55,44 @@ print("after init")
 #         assert(mina.ledger_crypto_tests())
 
 
-# class TestGetAddress:
-#     def test(self):
-#         # Address generation tests
-#         #
-#         #     These tests were automatically generated from the Mina c-reference-signer
-#         #
-#         #     Details:  https://github.com/MinaProtocol/c-reference-signer/README.markdown
-#         #     Generate: ./unit_tests ledger_gen
+class TestGetAddress:
+    def test(self):
+        # Address generation tests
+        #
+        #     These tests were automatically generated from the Mina c-reference-signer
+        #
+        #     Details:  https://github.com/MinaProtocol/c-reference-signer/README.markdown
+        #     Generate: ./unit_tests ledger_gen
 
-#         # account 0
-#         # private key 164244176fddb5d769b7de2027469d027ad428fadcc0c02396e6280142efb718
-#         assert(get_address(0) ==
-#                "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV")
+        # account 0
+        # private key 164244176fddb5d769b7de2027469d027ad428fadcc0c02396e6280142efb718
+        assert(get_address(0) ==
+               "B62qnzbXmRNo9q32n4SNu2mpB8e7FYYLH8NmaX6oFCBYjjQ8SbD7uzV")
 
-#         # account 1
-#         # private key 3ca187a58f09da346844964310c7e0dd948a9105702b716f4d732e042e0c172e
-#         assert(get_address(1) ==
-#                "B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt")
+        # account 1
+        # private key 3ca187a58f09da346844964310c7e0dd948a9105702b716f4d732e042e0c172e
+        assert(get_address(1) ==
+               "B62qicipYxyEHu7QjUqS7QvBipTs5CzgkYZZZkPoKVYBu6tnDUcE9Zt")
 
-#         # account 2
-#         # private key 336eb4a19b3d8905824b0f2254fb495573be302c17582748bf7e101965aa4774
-#         assert(get_address(2) ==
-#                "B62qrKG4Z8hnzZqp1AL8WsQhQYah3quN1qUj3SyfJA8Lw135qWWg1mi")
+        # account 2
+        # private key 336eb4a19b3d8905824b0f2254fb495573be302c17582748bf7e101965aa4774
+        assert(get_address(2) ==
+               "B62qrKG4Z8hnzZqp1AL8WsQhQYah3quN1qUj3SyfJA8Lw135qWWg1mi")
 
-#         # account 3
-#         # private key 1dee867358d4000f1dafa5978341fb515f89eeddbe450bd57df091f1e63d4444
-#         assert(get_address(3) ==
-#                "B62qoqiAgERjCjXhofXiD7cMLJSKD8hE8ZtMh4jX5MPNgKB4CFxxm1N")
+        # account 3
+        # private key 1dee867358d4000f1dafa5978341fb515f89eeddbe450bd57df091f1e63d4444
+        assert(get_address(3) ==
+               "B62qoqiAgERjCjXhofXiD7cMLJSKD8hE8ZtMh4jX5MPNgKB4CFxxm1N")
 
-#         # account 49370
-#         # private key 20f84123a26e58dd32b0ea3c80381f35cd01bc22a20346cc65b0a67ae48532ba
-#         assert(get_address(49370) ==
-#                "B62qkiT4kgCawkSEF84ga5kP9QnhmTJEYzcfgGuk6okAJtSBfVcjm1M")
+        # account 49370
+        # private key 20f84123a26e58dd32b0ea3c80381f35cd01bc22a20346cc65b0a67ae48532ba
+        assert(get_address(49370) ==
+               "B62qkiT4kgCawkSEF84ga5kP9QnhmTJEYzcfgGuk6okAJtSBfVcjm1M")
 
-#         # account 0x312a
-#         # private key 3414fc16e86e6ac272fda03cf8dcb4d7d47af91b4b726494dab43bf773ce1779
-#         assert(get_address(0x312a) ==
-#                "B62qoG5Yk4iVxpyczUrBNpwtx2xunhL48dydN53A2VjoRwF8NUTbVr4")
+        # account 0x312a
+        # private key 3414fc16e86e6ac272fda03cf8dcb4d7d47af91b4b726494dab43bf773ce1779
+        assert(get_address(0x312a) ==
+               "B62qoG5Yk4iVxpyczUrBNpwtx2xunhL48dydN53A2VjoRwF8NUTbVr4")
 
 
 # class TestSignTx:
@@ -482,13 +482,13 @@ print("after init")
 #     print("Performed crypto tests in {:0.03f} seconds".format(duration))
 
 
-# def run_get_address_tests():
-#     t0 = time.time()
-#     TestGetAddress.test(None)
-#     # Performance report
-#     duration = time.time() - t0
-#     print(
-#         "Performed 6 get-address operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/6.0))
+def run_get_address_tests():
+    t0 = time.time()
+    TestGetAddress.test(None)
+    # Performance report
+    duration = time.time() - t0
+    print(
+        "Performed 6 get-address operations in {:0.03f} seconds ({:0.03f} sec per operation)".format(duration, duration/6.0))
 
 
 # def run_signature_tests():
@@ -510,14 +510,14 @@ print("after init")
 if __name__ == "__main__":
     print("Running unit tests...")
 
-#     try:
-#         if args.kind == "all":
-#             run_crypto_tests()
-#             run_get_address_tests()
-#             run_signature_tests()
-#             run_fuzz_tests()
-#         if args.kind == "release":
-#             run_get_address_tests()
+    try:
+        # if args.kind == "all":
+        # run_crypto_tests()
+        #             run_get_address_tests()
+        #             run_signature_tests()
+        #             run_fuzz_tests()
+        if args.kind == "release":
+            run_get_address_tests()
 #             run_signature_tests()
 #             run_fuzz_tests()
 #         elif args.kind == "crypto":
@@ -528,10 +528,10 @@ if __name__ == "__main__":
 #             run_get_address_tests()
 #         elif args.kind == "sign-transaction":
 #             run_signature_tests()
-#     except AssertionError:
-#         raise
-#     except Exception as ex:
-#         print("{}".format(ex))
-#         sys.exit(233)
+    except AssertionError:
+        raise
+    except Exception as ex:
+        print("{}".format(ex))
+        sys.exit(233)
 
 print("Completed unit tests successfully!")
