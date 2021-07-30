@@ -127,7 +127,7 @@ jobs:
         env:
           SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
         run: |
-          /speculos/speculos.py --log-level speculos:DEBUG --log-level automation:DEBUG --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf &
+          /speculos/speculos.py --log-level apdu:DEBUG --log-level bagl:DEBUG --log-level button:DEBUG --log-level display:DEBUG --log-level finger:DEBUG --log-level seproxyhal:DEBUG --log-level speculos-client:DEBUG --log-level usb:DEBUG --log-level speculos:DEBUG --log-level automation:DEBUG --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf &
           echo $! >/tmp/speculos.pid
           timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do echo 'hi' && sleep 1; done'
 
