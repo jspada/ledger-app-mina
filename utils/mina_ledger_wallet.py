@@ -800,8 +800,8 @@ def ledger_get_address(account):
         print("\n\napduMessage hex ({}) = {}\n".format(
             int(len(account)/2), apduMessage))
 
-    return "0x123421"
-    # return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
+    # a = DONGLE.exchange(apdu)
+    return DONGLE.exchange(apdu).decode('utf-8').rstrip('\x00')
 
 
 def ledger_sign_tx(tx_type, sender_account, sender_address, receiver, amount, fee, nonce, valid_until, memo, network_id):
