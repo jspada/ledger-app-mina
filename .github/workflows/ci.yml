@@ -108,7 +108,7 @@ jobs:
           LEDGER_PROXY_ADDRESS: 127.0.0.1
           LEDGER_PROXY_PORT: 9999
         run: |
-          python3 tests/unit_tests.py
+          pytest tests/unit_tests.py
 
       - name: Kill speculos
         run: |
@@ -134,7 +134,7 @@ jobs:
           LEDGER_PROXY_ADDRESS: 127.0.0.1
           LEDGER_PROXY_PORT: 9999
         run: |
-          python3 tests/unit_tests.py
+          pytest tests/unit_tests.py
 
       - name: Upload speculos log
         uses: actions/upload-artifact@v2
