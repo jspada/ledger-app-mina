@@ -3,9 +3,11 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master ]
+    branches:
+      - master
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -30,7 +32,7 @@ jobs:
         env:
           NANO_MODEL: nanos
         run: |
-          make DEBUG=1
+          make
 
       - name: Upload app binary
         uses: actions/upload-artifact@v2
@@ -46,7 +48,7 @@ jobs:
         env:
           NANO_MODEL: nanox
         run: |
-          make DEBUG=1 BOLOS_SDK=$NANOX_SDK
+          make BOLOS_SDK=$NANOX_SDK
 
       - name: Upload app binary
         uses: actions/upload-artifact@v2
@@ -71,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/speculos:latest
+      image: ghcr.io/ledgerhq/speculos@sha256:c5aa03b4b52caa31db6ebd77aacee837fbe04c1a77c74bfb312ba6d1817ed4ea
       options: --entrypoint /bin/bash
 
     steps:
@@ -80,7 +82,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update -q
-          apt-get install -qy git netcat
+          apt-get install -qy git netcat procps
           pip3 install ledgerblue pytest
 
       - name: Download Nano S app binary
@@ -95,50 +97,38 @@ jobs:
           name: app-debug-nanox
           path: bin-nanox
 
-      - name: Run speculos in the background
-        env:
-          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
-        run: |
-          /speculos/speculos.py --model nanos --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanos/app.elf 2>speculos.log &
-          echo $! >/tmp/speculos.pid
-          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
-
-      - name: Run speculos tests against the Nano S app
+      - name: Run tests on Nano S
         env:
           LEDGER_PROXY_ADDRESS: 127.0.0.1
           LEDGER_PROXY_PORT: 9999
+          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
         run: |
+          nohup bash -c "python3 /speculos/speculos.py --model nanos --display headless --automation file:emulator_automation.json --seed '${SEED}' bin-nanos/app.elf" > speculos.log 2<&1 &
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
           pytest tests/unit_tests.py
-
-      - name: Kill speculos
-        run: |
-          kill -9 $(cat /tmp/speculos.pid)
+          kill -9 $(pgrep python3) $(pgrep qemu)
 
       - name: Upload speculos log
+        if: ${{ always() }}
         uses: actions/upload-artifact@v2
-        if: failure()
         with:
           name: speculos-nanos-log
           path: speculos.log
 
-      - name: Run speculos in the background
-        env:
-          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
-        run: |
-          /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed "${SEED}" bin-nanox/app.elf 2>speculos.log &
-          echo $! >/tmp/speculos.pid
-          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
-
-      - name: Run tests against the Nano X app
+      - name: Run tests on Nano X
         env:
           LEDGER_PROXY_ADDRESS: 127.0.0.1
           LEDGER_PROXY_PORT: 9999
+          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
         run: |
+          nohup bash -c "python3 /speculos/speculos.py --model nanox --display headless --automation file:emulator_automation.json --seed '${SEED}' bin-nanox/app.elf" > speculos.log 2<&1 &
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
           pytest tests/unit_tests.py
+          kill -9 $(pgrep python3) $(pgrep qemu)
 
       - name: Upload speculos log
+        if: ${{ always() }}
         uses: actions/upload-artifact@v2
-        if: failure()
         with:
           name: speculos-nanox-log
           path: speculos.log
