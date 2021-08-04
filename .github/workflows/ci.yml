@@ -4,10 +4,10 @@ on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
     branches:
-      - master
+      - ci-run-crypto-tests
   pull_request:
     branches:
-      - master
+      - ci-run-crypto-tests
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -28,32 +28,32 @@ jobs:
       - name: Get all git tags
         run: git fetch --prune --unshallow --tags
 
-      - name: Build Nano S app
+      - name: Build Nano S app release binary
         env:
           NANO_MODEL: nanos
         run: |
           make
 
-      - name: Upload app binary
+      - name: Upload Nano S app release binary
         uses: actions/upload-artifact@v2
         with:
-          name: app-debug-nanos
+          name: app-nanos
           path: bin
 
       - name: Cleanup the repository
         run: |
           git clean -dxf
 
-      - name: Build Nano X app
+      - name: Build Nano X app release binary
         env:
           NANO_MODEL: nanox
         run: |
           make BOLOS_SDK=$NANOX_SDK
 
-      - name: Upload app binary
+      - name: Upload Nano X app release binary
         uses: actions/upload-artifact@v2
         with:
-          name: app-debug-nanox
+          name: app-nanox
           path: bin
 
       - name: Build with Clang Static Analyzer
@@ -85,19 +85,19 @@ jobs:
           apt-get install -qy git netcat procps
           pip3 install ledgerblue pytest
 
-      - name: Download Nano S app binary
+      - name: Download Nano S app release binary
         uses: actions/download-artifact@v2
         with:
-          name: app-debug-nanos
+          name: app-nanos
           path: bin-nanos
 
-      - name: Download Nano X app binary
+      - name: Download Nano X app release binary
         uses: actions/download-artifact@v2
         with:
-          name: app-debug-nanox
+          name: app-nanox
           path: bin-nanox
 
-      - name: Run tests on Nano S
+      - name: Run tests on Nano S app release binary
         env:
           LEDGER_PROXY_ADDRESS: 127.0.0.1
           LEDGER_PROXY_PORT: 9999
@@ -115,7 +115,7 @@ jobs:
           name: speculos-nanos-log
           path: speculos.log
 
-      - name: Run tests on Nano X
+      - name: Run tests on Nano X app release binary
         env:
           LEDGER_PROXY_ADDRESS: 127.0.0.1
           LEDGER_PROXY_PORT: 9999
