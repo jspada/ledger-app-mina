@@ -180,3 +180,21 @@ jobs:
         with:
           name: speculos-nanox-log
           path: speculos.log
+
+      - name: Run full tests on Nano S app test binary
+        env:
+          LEDGER_PROXY_ADDRESS: 127.0.0.1
+          LEDGER_PROXY_PORT: 9999
+          SEED: course grief vintage slim tell hospital car maze model style elegant kitchen state purpose matrix gas grid enable frown road goddess glove canyon key
+        run: |
+          nohup bash -c "python3 /speculos/speculos.py --model nanos --display headless --automation file:emulator_automation.json --seed '${SEED}' bin-nanos-test/app.elf" > speculos.log 2<&1 &
+          timeout 10 sh -c 'until nc -z 127.0.0.1 9999; do sleep 1; done'
+          python3 tests/unit_tests.py --kind all
+          kill -9 $(pgrep python3) $(pgrep qemu)
+
+      - name: Upload speculos log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: speculos-nanos-test-log
+          path: speculos.log
