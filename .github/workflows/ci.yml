@@ -121,6 +121,18 @@ jobs:
           apt-get install -qy git netcat procps
           pip3 install ledgerblue pytest
 
+      - name: Download Nano S app test binary
+        uses: actions/download-artifact@v2
+        with:
+          name: app-nanos-test
+          path: bin-nanos-test
+
+      - name: Download Nano X app test binary
+        uses: actions/download-artifact@v2
+        with:
+          name: app-nanox-test
+          path: bin-nanox-test
+
       - name: Download Nano S app release binary
         uses: actions/download-artifact@v2
         with:
