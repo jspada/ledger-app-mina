@@ -41,7 +41,7 @@ endif
 ################
 # Default rule #
 ################
-all: default stop_emulator test
+all: default
 
 ############
 # Platform #
