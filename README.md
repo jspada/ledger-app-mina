@@ -15,7 +15,7 @@ sudo apt install python3-venv python3-dev libudev-dev libusb-1.0-0-dev
 
 # install pyelftools if using emulator
 pip3 install --upgrade pip
-pip3 install pyelftools mnemonic jsonschema construct pyqt5
+pip3 install pytest pyelftools mnemonic jsonschema construct pyqt5 flask flask-restful
 
 # (x or s, depending on your device)
 source prepare-devenv.sh s
