@@ -270,17 +270,19 @@ endef
 export RELEASE_README
 
 define RELEASE_DEPS
+#!/bin/sh
+
 if ! which python3 > /dev/null 2>&1 ; then
     echo "Error: Please install python3"
-	exit 211;
+    exit 211;
 fi
 if ! which pip3 > /dev/null 2>&1 ; then
     echo "Error: Please install pip3"
-	exit
+    exit
 fi
 if ! pip3 -q show ledgerblue ; then
     echo "Error: please pip3 install ledgerblue"
-	exit
+    exit
 fi
 read -p "Please unlock your Ledger device and exit any apps (press any key to continue) " unused
 endef
@@ -315,7 +317,7 @@ side_release: all
 	@chmod +x install.sh
 
 	@echo "$$RELEASE_DEPS" > uninstall.sh
-	@echo "python3 -m ledgerblue.deleteApp $(APP_DELETE_PARAMS_EVALUATED)" > uninstall.sh
+	@echo "python3 -m ledgerblue.deleteApp $(APP_DELETE_PARAMS_EVALUATED)" >> uninstall.sh
 	@chmod +x uninstall.sh
 
 	@cp utils/mina_ledger_wallet.py mina_ledger_wallet
