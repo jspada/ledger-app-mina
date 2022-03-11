@@ -1224,7 +1224,7 @@ if __name__ == "__main__":
                 "mint_tokens": null
             }""")
 
-            # Re-encode the signature such that it can be broadcast via sendPayment mutation
+            # Re-encode the signature such that it can be broadcast via GraphQL > 1.3.0alpha3
             transaction_json["signature"] = re_encode_raw_signature(signature)
             if args.operation == "send-payment":
                 transaction_json["payment"] = transaction_data
