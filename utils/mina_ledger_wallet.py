@@ -723,6 +723,21 @@ def ledger_send_apdu(apdu_hex):
 def ledger_crypto_tests():
     return ledger_send_apdu("e004000000")
 
+
+def re_encode_raw_signature(signature):
+
+    def shuffle_bytes(hex):
+        return "".join(reversed([hex[i:i+2] for i in range(0, len(hex), 2)]))
+
+    if len(signature) != 128:
+        raise Exception("Invalid raw signature input")
+
+    field = signature[0:64]
+    scalar = signature[64:]
+
+    return shuffle_bytes(field) + shuffle_bytes(scalar)
+
+
 def ledger_get_address(account):
     # Create APDU message.
     # CLA 0xe0 CLA
@@ -1209,7 +1224,8 @@ if __name__ == "__main__":
                 "mint_tokens": null
             }""")
 
-            transaction_json["signature"] = signature
+            # Re-encode the signature such that it can be broadcast via sendPayment mutation
+            transaction_json["signature"] = re_encode_raw_signature(signature)
             if args.operation == "send-payment":
                 transaction_json["payment"] = transaction_data
             elif args.operation == "delegate":
