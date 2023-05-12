@@ -3,6 +3,9 @@
 ## Overview
 This is the Mina app for the Ledger Nano S and Nano X hardware wallet.
 
+## Legacy
+This is the legacy repository for ledger-app-mina, which was succeffully approved by Ledger.  The official Ledger repository is now https://github.com/LedgerHQ/app-mina
+
 ## Building and installing
 To build and install the app on your Ledger Nano you must set up the Ledger Nano build environments. Please follow the Getting Started instructions at [here](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html).
 
